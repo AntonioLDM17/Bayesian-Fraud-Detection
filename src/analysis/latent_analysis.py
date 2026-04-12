@@ -24,35 +24,16 @@ def load_csv(path: str | Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def infer_join_key(
-    latent_df: pd.DataFrame,
-    other_df: pd.DataFrame,
-) -> str | None:
-    """
-    Try to infer a safe join key shared by both dataframes.
-    """
-    candidate_keys = [
-        "row_id",
-        "index",
-        "sample_index",
-        "original_index",
-        "transaction_id",
-    ]
-
-    for key in candidate_keys:
-        if key in latent_df.columns and key in other_df.columns:
-            return key
-
-    return None
-
-
-def merge_optional(
+def merge_on_row_id(
     latent_df: pd.DataFrame,
     other_df: pd.DataFrame | None,
     name: str,
 ) -> tuple[pd.DataFrame, list[str]]:
     """
-    Merge an optional dataframe if a shared key exists.
+    Merge an optional dataframe on row_id.
+
+    Keeps the latent dataframe as the base table and only adds columns
+    that are not already present (except row_id).
     """
     messages: list[str] = []
 
@@ -60,15 +41,37 @@ def merge_optional(
         messages.append(f"{name}: not provided.")
         return latent_df, messages
 
-    join_key = infer_join_key(latent_df, other_df)
-    if join_key is None:
-        messages.append(
-            f"{name}: no shared key found, skipping merge."
-        )
+    if "row_id" not in latent_df.columns:
+        messages.append(f"{name}: latent dataframe has no 'row_id', skipping merge.")
         return latent_df, messages
 
-    merged = latent_df.merge(other_df, on=join_key, how="left")
-    messages.append(f"{name}: merged using key '{join_key}'.")
+    if "row_id" not in other_df.columns:
+        messages.append(f"{name}: other dataframe has no 'row_id', skipping merge.")
+        return latent_df, messages
+
+    other_df = other_df.copy()
+
+    # Keep only row_id + new columns that are not already in latent_df
+    cols_to_add = ["row_id"] + [
+        col for col in other_df.columns
+        if col != "row_id" and col not in latent_df.columns
+    ]
+
+    if cols_to_add == ["row_id"]:
+        messages.append(f"{name}: no new columns to merge.")
+        return latent_df, messages
+
+    merged = latent_df.merge(
+        other_df[cols_to_add],
+        on="row_id",
+        how="left",
+    )
+
+    matched_rows = int(merged[cols_to_add[1:]].notna().any(axis=1).sum()) if len(cols_to_add) > 1 else 0
+    messages.append(
+        f"{name}: merged on 'row_id'. Added columns={cols_to_add[1:]}. "
+        f"Rows with at least one matched value={matched_rows}/{len(merged)}."
+    )
     return merged, messages
 
 
@@ -76,6 +79,9 @@ def plot_latent_by_class(
     df: pd.DataFrame,
     output_path: Path,
 ) -> None:
+    if TARGET_COLUMN not in df.columns:
+        return
+
     plt.figure(figsize=(8, 6))
 
     unique_values = sorted(df[TARGET_COLUMN].dropna().unique())
@@ -130,11 +136,15 @@ def plot_latent_by_uncertainty(
     if "uncertainty_std" not in df.columns:
         return
 
+    sub = df.dropna(subset=["uncertainty_std"]).copy()
+    if len(sub) == 0:
+        return
+
     plt.figure(figsize=(8, 6))
     scatter = plt.scatter(
-        df["z1"],
-        df["z2"],
-        c=df["uncertainty_std"],
+        sub["z1"],
+        sub["z2"],
+        c=sub["uncertainty_std"],
         s=18,
         alpha=0.75,
     )
@@ -214,6 +224,7 @@ def summarize_latent_space(df: pd.DataFrame) -> dict[str, Any]:
     summary: dict[str, Any] = {
         "num_points": int(len(df)),
         "columns": list(df.columns),
+        "row_id_included": "row_id" in df.columns,
     }
 
     if TARGET_COLUMN in df.columns:
@@ -235,19 +246,22 @@ def summarize_latent_space(df: pd.DataFrame) -> dict[str, Any]:
         }
 
     if "uncertainty_std" in df.columns:
-        summary["uncertainty_summary"] = {
-            "mean_uncertainty": float(df["uncertainty_std"].mean()),
-            "median_uncertainty": float(df["uncertainty_std"].median()),
-        }
+        uncertainty_non_null = df["uncertainty_std"].dropna()
+        if len(uncertainty_non_null) > 0:
+            summary["uncertainty_summary"] = {
+                "mean_uncertainty": float(uncertainty_non_null.mean()),
+                "median_uncertainty": float(uncertainty_non_null.median()),
+                "matched_rows": int(uncertainty_non_null.shape[0]),
+            }
 
         if TARGET_COLUMN in df.columns:
             summary["uncertainty_by_class"] = {}
             for class_value in sorted(df[TARGET_COLUMN].dropna().unique()):
-                sub = df[df[TARGET_COLUMN] == class_value]
+                sub = df[(df[TARGET_COLUMN] == class_value) & df["uncertainty_std"].notna()]
                 summary["uncertainty_by_class"][str(class_value)] = {
                     "count": int(len(sub)),
-                    "mean_uncertainty": float(sub["uncertainty_std"].mean()),
-                    "median_uncertainty": float(sub["uncertainty_std"].median()),
+                    "mean_uncertainty": float(sub["uncertainty_std"].mean()) if len(sub) > 0 else None,
+                    "median_uncertainty": float(sub["uncertainty_std"].median()) if len(sub) > 0 else None,
                 }
 
     return summary
@@ -255,17 +269,13 @@ def summarize_latent_space(df: pd.DataFrame) -> dict[str, Any]:
 
 def run_latent_analysis(
     latent_csv_path: str | Path = "experiments/gplvm_results/latent_embeddings.csv",
-    uncertainty_csv_path: str | Path | None = None,
-    decision_csv_path: str | Path | None = None,
+    uncertainty_csv_path: str | Path | None = "experiments/bnn_results/uncertainty_analysis/test_uncertainty_per_sample.csv",
+    decision_csv_path: str | Path | None = "experiments/bnn_results/decision_analysis/test_decisions_per_sample.csv",
     output_dir: str | Path = "experiments/gplvm_results/latent_analysis",
 ) -> dict[str, Any]:
     """
-    Analyze GPLVM latent embeddings and optionally enrich them with
-    BNN uncertainty and decision outputs.
-
-    Notes:
-    - Best results happen when latent_embeddings.csv includes a join key
-      also present in uncertainty/decision files.
+    Analyze GPLVM latent embeddings and enrich them with
+    BNN uncertainty and decision outputs using row_id.
     """
     output_dir = ensure_dir(output_dir)
 
@@ -282,10 +292,10 @@ def run_latent_analysis(
 
     notes: list[str] = []
 
-    merged_df, msgs = merge_optional(latent_df, uncertainty_df, "uncertainty")
+    merged_df, msgs = merge_on_row_id(latent_df, uncertainty_df, "uncertainty")
     notes.extend(msgs)
 
-    merged_df, msgs = merge_optional(merged_df, decision_df, "decision")
+    merged_df, msgs = merge_on_row_id(merged_df, decision_df, "decision")
     notes.extend(msgs)
 
     class_plot = output_dir / "latent_space_by_class.png"
@@ -334,8 +344,4 @@ def run_latent_analysis(
 
 
 if __name__ == "__main__":
-    run_latent_analysis(
-        latent_csv_path="experiments/gplvm_results/latent_embeddings.csv",
-        uncertainty_csv_path=None,
-        decision_csv_path=None,
-    )
+    run_latent_analysis()

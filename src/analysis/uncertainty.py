@@ -22,7 +22,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def load_data(csv_path: str | Path) -> pd.DataFrame:
-    """Load fraud dataset from CSV."""
+    """Load fraud dataset from CSV and preserve original row index."""
     csv_path = Path(csv_path)
     if not csv_path.exists():
         raise FileNotFoundError(f"Dataset not found at: {csv_path}")
@@ -35,6 +35,10 @@ def load_data(csv_path: str | Path) -> pd.DataFrame:
             f"Available columns: {list(df.columns)}"
         )
 
+    # Preserve original row identity for downstream joins.
+    df = df.copy()
+    df["row_id"] = df.index
+
     return df
 
 
@@ -45,6 +49,10 @@ def split_data(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
     """
     Must match the split logic used in training/evaluation.
+
+    Note:
+    X keeps row_id so we can propagate it to outputs, but row_id must be
+    removed before feeding the model.
     """
     X = df.drop(columns=[TARGET_COLUMN])
     y = df[TARGET_COLUMN].astype(int)
@@ -105,7 +113,7 @@ def _build_bnn_from_checkpoint(checkpoint: dict[str, Any]) -> BayesianMLP:
 def load_bnn_artifacts(
     checkpoint_path: str | Path,
     preprocessor_path: str | Path,
-) -> tuple[BayesianMLP, Any]:
+) -> tuple[BayesianMLP, Any, Any]:
     """
     Load BNN checkpoint and preprocessor.
     """
@@ -310,18 +318,26 @@ def run_uncertainty_analysis(
         raise ValueError("split must be 'validation' or 'test'.")
 
     if split == "validation":
-        X_eval = X_val
+        X_eval = X_val.copy()
         y_eval = y_val
     else:
-        X_eval = X_test
+        X_eval = X_test.copy()
         y_eval = y_test
+
+    if "row_id" not in X_eval.columns:
+        raise ValueError("Expected 'row_id' column in X_eval but it was not found.")
+
+    row_ids = X_eval["row_id"].to_numpy()
+
+    # Remove row_id before applying the model preprocessor.
+    X_eval_features = X_eval.drop(columns=["row_id"])
 
     model, guide, preprocessor = load_bnn_artifacts(
         checkpoint_path=checkpoint_path,
         preprocessor_path=preprocessor_path,
     )
 
-    X_transformed = preprocessor.transform(X_eval).astype(np.float32)
+    X_transformed = preprocessor.transform(X_eval_features).astype(np.float32)
     X_tensor = torch.tensor(X_transformed, dtype=torch.float32, device=DEVICE)
 
     mean_probs, std_probs = predict_with_uncertainty(
@@ -337,6 +353,7 @@ def run_uncertainty_analysis(
 
     results_df = pd.DataFrame(
         {
+            "row_id": row_ids,
             "y_true": y_true,
             "y_pred": y_pred,
             "predicted_probability": mean_probs,
@@ -354,6 +371,7 @@ def run_uncertainty_analysis(
         "device": DEVICE,
         "checkpoint_path": str(checkpoint_path),
         "preprocessor_path": str(preprocessor_path),
+        "row_id_included": True,
     }
 
     csv_path = output_dir / f"{split}_uncertainty_per_sample.csv"

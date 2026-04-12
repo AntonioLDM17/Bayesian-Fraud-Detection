@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 
@@ -69,8 +68,10 @@ def summarize_decisions(df: pd.DataFrame) -> dict[str, Any]:
     """Summarize decision distribution and fraud composition."""
     summary: dict[str, Any] = {}
 
+    summary["row_id_included"] = "row_id" in df.columns
+
     decision_counts = df["decision"].value_counts(dropna=False).to_dict()
-    summary["decision_counts"] = {k: int(v) for k, v in decision_counts.items()}
+    summary["decision_counts"] = {str(k): int(v) for k, v in decision_counts.items()}
 
     summary["by_decision"] = {}
     for decision in ["ACCEPT", "REVIEW", "BLOCK"]:
@@ -124,6 +125,9 @@ def run_decision_analysis(
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
 
+    # row_id is optional for backward compatibility, but should be present now.
+    row_id_present = "row_id" in df.columns
+
     df_decisions = add_decisions(
         df,
         block_probability_threshold=block_probability_threshold,
@@ -137,6 +141,7 @@ def run_decision_analysis(
         "review_probability_threshold": review_probability_threshold,
         "uncertainty_threshold": uncertainty_threshold,
     }
+    summary["row_id_included"] = row_id_present
 
     csv_out = output_dir / "test_decisions_per_sample.csv"
     json_out = output_dir / "test_decision_summary.json"

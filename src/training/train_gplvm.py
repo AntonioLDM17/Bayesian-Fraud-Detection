@@ -4,13 +4,14 @@ import json
 from pathlib import Path
 from typing import Any
 
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import joblib
 from sklearn.decomposition import PCA
 from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -30,6 +31,9 @@ def set_seed(seed: int = RANDOM_STATE) -> None:
 
 
 def load_data(csv_path: str | Path) -> pd.DataFrame:
+    """
+    Load dataset and preserve original row identity.
+    """
     csv_path = Path(csv_path)
     if not csv_path.exists():
         raise FileNotFoundError(f"Dataset not found at: {csv_path}")
@@ -42,7 +46,40 @@ def load_data(csv_path: str | Path) -> pd.DataFrame:
             f"Available columns: {list(df.columns)}"
         )
 
+    df = df.copy()
+    df["row_id"] = df.index
+
     return df
+
+
+def split_dataframes(
+    df: pd.DataFrame,
+    test_size: float = 0.2,
+    val_size: float = 0.2,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Split full dataframe into train / validation / test using the same logic
+    as the rest of the project.
+
+    Returns full dataframes, not just X/y separately.
+    """
+    train_val_df, test_df = train_test_split(
+        df,
+        test_size=test_size,
+        stratify=df[TARGET_COLUMN],
+        random_state=RANDOM_STATE,
+    )
+
+    adjusted_val_size = val_size / (1.0 - test_size)
+
+    train_df, val_df = train_test_split(
+        train_val_df,
+        test_size=adjusted_val_size,
+        stratify=train_val_df[TARGET_COLUMN],
+        random_state=RANDOM_STATE,
+    )
+
+    return train_df.reset_index(drop=True), val_df.reset_index(drop=True), test_df.reset_index(drop=True)
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -60,20 +97,23 @@ def build_preprocessor() -> Pipeline:
     )
 
 
-def sample_latent_dataset(
-    df: pd.DataFrame,
+def sample_latent_dataset_from_test(
+    test_df: pd.DataFrame,
     nonfraud_multiplier: int = 3,
     max_nonfraud: int | None = 1500,
 ) -> pd.DataFrame:
     """
-    Build a manageable subset for GPLVM:
-    - all frauds
-    - a random sample of non-frauds
+    Build a manageable GPLVM subset from the TEST split only.
 
-    Since GPLVM scales cubically with N, keep this subset moderate.
+    Strategy:
+    - include all fraud cases from test
+    - include a sample of non-fraud cases from test
+
+    This ensures the latent space is aligned with the same evaluation split
+    used by uncertainty.py and decision_rules.py.
     """
-    fraud_df = df[df[TARGET_COLUMN] == 1].copy()
-    nonfraud_df = df[df[TARGET_COLUMN] == 0].copy()
+    fraud_df = test_df[test_df[TARGET_COLUMN] == 1].copy()
+    nonfraud_df = test_df[test_df[TARGET_COLUMN] == 0].copy()
 
     n_fraud = len(fraud_df)
     n_nonfraud_target = n_fraud * nonfraud_multiplier
@@ -199,7 +239,10 @@ def train_gplvm(
             best_loss = loss_value
             best_epoch = epoch
             best_state = {
-                "model_state_dict": {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+                "model_state_dict": {
+                    k: v.detach().cpu().clone()
+                    for k, v in model.state_dict().items()
+                }
             }
 
         if epoch % print_every == 0 or epoch == 1 or epoch == num_epochs:
@@ -232,25 +275,33 @@ def train_and_save(
     output_dir: str | Path = "experiments/gplvm_results",
 ) -> dict[str, Any]:
     """
-    Train GPLVM on a fraud-focused subset and save latent embeddings + plots.
+    Train GPLVM on a TEST-split subset and save latent embeddings + plots.
+
+    This is adapted to align the GPLVM universe with the BNN uncertainty and
+    decision analysis, which are also computed on the test split.
     """
     set_seed()
     output_dir = ensure_dir(output_dir)
 
     df = load_data(data_path)
-    subset_df = sample_latent_dataset(
-        df=df,
+    _, _, test_df = split_dataframes(df)
+
+    subset_df = sample_latent_dataset_from_test(
+        test_df=test_df,
         nonfraud_multiplier=3,
         max_nonfraud=1500,
     )
 
-    feature_cols = [col for col in subset_df.columns if col != TARGET_COLUMN]
+    # Keep row_id for future merges, but do not use it as an input feature.
+    excluded_cols = {TARGET_COLUMN, "row_id"}
+    feature_cols = [col for col in subset_df.columns if col not in excluded_cols]
+
     Y_raw = subset_df[feature_cols].copy()
 
     preprocessor = build_preprocessor()
     Y = preprocessor.fit_transform(Y_raw).astype(np.float32)
 
-    print(f"Training GPLVM on subset with shape: {Y.shape}")
+    print(f"Training GPLVM on TEST subset with shape: {Y.shape}")
     print(f"Fraud count: {(subset_df[TARGET_COLUMN] == 1).sum()}")
     print(f"Non-fraud count: {(subset_df[TARGET_COLUMN] == 0).sum()}")
 
@@ -264,6 +315,7 @@ def train_and_save(
     )
 
     latent_positions = model.get_latent_positions().cpu().numpy()
+
     latent_df = subset_df.copy()
     latent_df["z1"] = latent_positions[:, 0]
     latent_df["z2"] = latent_positions[:, 1]
@@ -283,9 +335,12 @@ def train_and_save(
             "training_info": training_info,
             "hyperparameters": model.get_hyperparameters(),
             "feature_columns": feature_cols,
+            "row_ids": latent_df["row_id"].tolist(),
+            "source_split": "test",
         },
         checkpoint_path,
     )
+
     joblib.dump(preprocessor, preprocessor_path)
     latent_df.to_csv(latent_csv_path, index=False)
 
@@ -298,6 +353,8 @@ def train_and_save(
         "checkpoint_path": str(checkpoint_path),
         "preprocessor_path": str(preprocessor_path),
         "latent_csv_path": str(latent_csv_path),
+        "row_id_included": True,
+        "source_split": "test",
     }
 
     with summary_json_path.open("w", encoding="utf-8") as f:

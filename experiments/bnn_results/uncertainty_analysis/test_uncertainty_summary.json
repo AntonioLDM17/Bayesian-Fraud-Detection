@@ -1,48 +1,48 @@
 {
   "overall": {
     "num_samples": 56962,
-    "mean_probability": 0.1153930127620697,
-    "mean_uncertainty": 0.11946747452020645,
-    "median_uncertainty": 0.0975412130355835
+    "mean_probability": 0.11603932827711105,
+    "mean_uncertainty": 0.12013265490531921,
+    "median_uncertainty": 0.09804127365350723
   },
   "by_true_class": {
     "0": {
       "count": 56864,
-      "mean_probability": 0.11403381824493408,
-      "mean_uncertainty": 0.119565948843956,
-      "median_uncertainty": 0.0976109430193901
+      "mean_probability": 0.11467884480953217,
+      "mean_uncertainty": 0.12023836374282837,
+      "median_uncertainty": 0.09813928604125977
     },
     "1": {
       "count": 98,
-      "mean_probability": 0.9040619730949402,
-      "mean_uncertainty": 0.062331248074769974,
-      "median_uncertainty": 0.01883472502231598
+      "mean_probability": 0.9054491519927979,
+      "mean_uncertainty": 0.0587959811091423,
+      "median_uncertainty": 0.011318995617330074
     }
   },
   "by_confusion_type": {
     "TP": {
-      "count": 87,
-      "mean_probability": 0.9854090213775635,
-      "mean_uncertainty": 0.04292625933885574,
-      "median_uncertainty": 0.015083296224474907
+      "count": 88,
+      "mean_probability": 0.9810279607772827,
+      "mean_uncertainty": 0.0413224957883358,
+      "median_uncertainty": 0.009718555957078934
     },
     "FP": {
-      "count": 1313,
-      "mean_probability": 0.6419255137443542,
-      "mean_uncertainty": 0.2727811634540558,
-      "median_uncertainty": 0.2636468708515167
+      "count": 1337,
+      "mean_probability": 0.6414139866828918,
+      "mean_uncertainty": 0.27351999282836914,
+      "median_uncertainty": 0.2623756229877472
     },
     "TN": {
-      "count": 55551,
-      "mean_probability": 0.10155659168958664,
-      "mean_uncertainty": 0.11594455689191818,
-      "median_uncertainty": 0.09567137807607651
+      "count": 55527,
+      "mean_probability": 0.10199591517448425,
+      "mean_uncertainty": 0.116547591984272,
+      "median_uncertainty": 0.0961516797542572
     },
     "FN": {
-      "count": 11,
-      "mean_probability": 0.26068100333213806,
-      "mean_uncertainty": 0.21580711007118225,
-      "median_uncertainty": 0.2509751617908478
+      "count": 10,
+      "mean_probability": 0.2403554916381836,
+      "mean_uncertainty": 0.21256263554096222,
+      "median_uncertainty": 0.24318361282348633
     }
   },
   "metadata": {
@@ -51,6 +51,7 @@
     "num_mc_samples": 200,
     "device": "cpu",
     "checkpoint_path": "experiments/bnn_results/bayesian_neural_network.pt",
-    "preprocessor_path": "experiments/bnn_results/preprocessor.joblib"
+    "preprocessor_path": "experiments/bnn_results/preprocessor.joblib",
+    "row_id_included": true
   }
 }

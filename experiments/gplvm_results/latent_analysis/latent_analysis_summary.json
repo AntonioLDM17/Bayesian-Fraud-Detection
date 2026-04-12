@@ -1,5 +1,5 @@
 {
-  "num_points": 1968,
+  "num_points": 392,
   "columns": [
     "Time",
     "V1",
@@ -32,16 +32,52 @@
     "V28",
     "Amount",
     "Class",
+    "row_id",
     "z1",
-    "z2"
+    "z2",
+    "y_true",
+    "y_pred",
+    "predicted_probability",
+    "uncertainty_std",
+    "confusion_type",
+    "decision"
   ],
+  "row_id_included": true,
   "class_counts": {
-    "0": 1476,
-    "1": 492
+    "0": 294,
+    "1": 98
+  },
+  "confusion_counts": {
+    "TN": 286,
+    "TP": 88,
+    "FN": 10,
+    "FP": 8
+  },
+  "decision_counts": {
+    "ACCEPT": 271,
+    "BLOCK": 79,
+    "REVIEW": 42
+  },
+  "uncertainty_summary": {
+    "mean_uncertainty": 0.10374321959067487,
+    "median_uncertainty": 0.0797298075,
+    "matched_rows": 392
+  },
+  "uncertainty_by_class": {
+    "0": {
+      "count": 294,
+      "mean_uncertainty": 0.11872563244217688,
+      "median_uncertainty": 0.098631705
+    },
+    "1": {
+      "count": 98,
+      "mean_uncertainty": 0.058795981036168864,
+      "median_uncertainty": 0.011318996
+    }
   },
   "notes": [
-    "uncertainty: not provided.",
-    "decision: not provided."
+    "uncertainty: merged on 'row_id'. Added columns=['y_true', 'y_pred', 'predicted_probability', 'uncertainty_std', 'confusion_type']. Rows with at least one matched value=392/392.",
+    "decision: merged on 'row_id'. Added columns=['decision']. Rows with at least one matched value=392/392."
   ],
   "paths": {
     "merged_csv": "experiments\\gplvm_results\\latent_analysis\\latent_analysis_merged.csv",
