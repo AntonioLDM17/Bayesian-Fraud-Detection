@@ -1,0 +1,36 @@
+{
+  "logistic_regression": {
+    "validation": {
+      "pr_auc": 0.6807113141715643,
+      "roc_auc": 0.9747276681486976,
+      "f1": 0.11187932118164676,
+      "precision": 0.0596514745308311,
+      "recall": 0.898989898989899
+    },
+    "test": {
+      "pr_auc": 0.7178737904575203,
+      "roc_auc": 0.9725522155260529,
+      "f1": 0.11553273427471117,
+      "precision": 0.06164383561643835,
+      "recall": 0.9183673469387755
+    },
+    "model_path": "experiments\\baseline_results\\logistic_regression.joblib"
+  },
+  "random_forest": {
+    "validation": {
+      "pr_auc": 0.8119193081807538,
+      "roc_auc": 0.9465089492963507,
+      "f1": 0.8070175438596491,
+      "precision": 0.9583333333333334,
+      "recall": 0.696969696969697
+    },
+    "test": {
+      "pr_auc": 0.8511200020802322,
+      "roc_auc": 0.9568721252569682,
+      "f1": 0.8323699421965318,
+      "precision": 0.96,
+      "recall": 0.7346938775510204
+    },
+    "model_path": "experiments\\baseline_results\\random_forest.joblib"
+  }
+}

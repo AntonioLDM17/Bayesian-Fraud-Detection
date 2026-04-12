@@ -1,0 +1,32 @@
+{
+  "decision_counts": {
+    "ACCEPT": 52154,
+    "REVIEW": 4716,
+    "BLOCK": 92
+  },
+  "by_decision": {
+    "ACCEPT": {
+      "count": 52154,
+      "fraud_rate": 0.00015339187790006518,
+      "mean_probability": 0.08360858020966559,
+      "mean_uncertainty": 0.10569950029591019
+    },
+    "REVIEW": {
+      "count": 4716,
+      "fraud_rate": 0.0029686174724342664,
+      "mean_probability": 0.449688895966921,
+      "mean_uncertainty": 0.2736343456759966
+    },
+    "BLOCK": {
+      "count": 92,
+      "fraud_rate": 0.8260869565217391,
+      "mean_probability": 0.9974142351086956,
+      "mean_uncertainty": 0.021685524885842914
+    }
+  },
+  "policy": {
+    "block_probability_threshold": 0.8,
+    "review_probability_threshold": 0.3,
+    "uncertainty_threshold": 0.1
+  }
+}

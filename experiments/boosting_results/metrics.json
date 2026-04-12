@@ -1,0 +1,38 @@
+{
+  "xgboost": {
+    "validation": {
+      "pr_auc": 0.8253700683989437,
+      "roc_auc": 0.9753525974267054,
+      "f1": 0.8148148148148148,
+      "precision": 0.8555555555555555,
+      "recall": 0.7777777777777778
+    },
+    "test": {
+      "pr_auc": 0.8697118764531045,
+      "roc_auc": 0.9770709634444661,
+      "f1": 0.84,
+      "precision": 0.8235294117647058,
+      "recall": 0.8571428571428571
+    },
+    "model_path": "experiments\\boosting_results\\xgboost.joblib",
+    "scale_pos_weight": 578.264406779661
+  },
+  "lightgbm": {
+    "validation": {
+      "pr_auc": 0.049408489348736456,
+      "roc_auc": 0.9026789890356709,
+      "f1": 0.1106612685560054,
+      "precision": 0.05929139551699204,
+      "recall": 0.8282828282828283
+    },
+    "test": {
+      "pr_auc": 0.05116551908928928,
+      "roc_auc": 0.9120306201405718,
+      "f1": 0.11223799864773495,
+      "precision": 0.06010137581462708,
+      "recall": 0.8469387755102041
+    },
+    "model_path": "experiments\\boosting_results\\lightgbm.joblib",
+    "scale_pos_weight": 578.264406779661
+  }
+}
