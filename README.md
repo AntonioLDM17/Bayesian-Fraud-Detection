@@ -1,125 +1,184 @@
 # 🧠 Uncertainty-Aware Fraud Detection
 
-*A probabilistic machine learning approach to fraud detection using Bayesian Neural Networks and uncertainty-aware decision making.*
+### *Bayesian Classification, Proper Scoring Rules & Latent Structure via GP-LVM*
 
 ---
 
 ## 📌 Overview
 
-Fraud detection in financial transactions is a highly challenging binary classification problem characterized by:
+Fraud detection in financial transactions is a highly challenging problem due to:
 
 * **Extreme class imbalance** (~1:578 fraud ratio)
-* **Noisy and anonymized features**
 * **High cost asymmetry** between false positives and false negatives
+* **Uncertainty in model predictions**
 
-Traditional machine learning models provide **point predictions**, which limits their usefulness in real-world decision-making scenarios.
-
-This project explores a **probabilistic AI approach**, combining deterministic and Bayesian models to:
-
-* Predict fraud probability
-* Quantify predictive uncertainty
-* Improve decision-making under risk
+Traditional machine learning models focus on **point predictions**, which are often insufficient for real-world decision-making.
 
 ---
 
-## 🎯 Objectives
+## 🎯 Project Goal
 
-The goal of this project is not only to maximize classification performance, but to:
+This project develops a **probabilistic AI framework for fraud detection**, going beyond classification accuracy by incorporating:
 
-* Compare **deterministic vs probabilistic models**
-* Evaluate the **quality of predicted probabilities**
-* Analyze **uncertainty as a decision-making signal**
-* Bridge the gap between **ML performance and business impact**
+* **Bayesian modeling and uncertainty estimation**
+* **Proper probabilistic evaluation (proper scoring rules)**
+* **Bayesian model comparison and calibration analysis**
+* **Latent variable modeling (GP-LVM)** to uncover hidden fraud patterns
 
 ---
 
-## 🧩 Models
+## 🧩 Methodology
 
-We implement and compare the following approaches:
+The project is structured into four main components:
 
-### 🔹 Baseline Models
+---
+
+### 🔹 1. Model Benchmarking
+
+We compare deterministic and probabilistic models:
+
+**Deterministic models**
 
 * Logistic Regression
-* Random Forest / Gradient Boosting (e.g., XGBoost, LightGBM)
+* Random Forest
+* Gradient Boosting (XGBoost / LightGBM)
 
-### 🔹 Probabilistic Models
+**Probabilistic model**
 
-* Bayesian Neural Networks (BNNs) using Variational Inference
-* (Optional extensions: hierarchical models or latent variable models)
-
----
-
-## 📊 Evaluation Metrics
-
-Given the extreme class imbalance, we use robust evaluation metrics:
-
-### Classification Metrics
-
-* **Precision-Recall AUC (PR-AUC)**
-* **F1-Score**
-* **Recall (Fraud Detection Rate)**
-
-### Probabilistic Metrics (Proper Scoring Rules)
-
-* **Negative Log-Likelihood (NLL)**
-* **Brier Score**
-* **Expected Calibration Error (ECE)**
-
-👉 These metrics allow us to evaluate not only *what the model predicts*, but *how well it predicts probabilities*.
+* Bayesian Neural Network (BNN) implemented with **Pyro + PyTorch**
 
 ---
 
-## 🧠 Uncertainty Modeling
+### 🔹 2. Probabilistic Evaluation
 
-A key contribution of this project is the analysis of predictive uncertainty:
+We evaluate models not only on classification performance but also on **probability quality**.
 
-* **Aleatoric uncertainty** (data noise)
-* **Epistemic uncertainty** (model uncertainty)
+#### Classification metrics (imbalanced setting)
 
-We estimate uncertainty using **Monte Carlo sampling** over the posterior in Bayesian models.
+* Precision-Recall AUC (PR-AUC)
+* F1-Score
+* Recall
+
+#### Proper scoring rules
+
+* Negative Log-Likelihood (NLL)
+* Brier Score
+* Expected Calibration Error (ECE)
+
+👉 This allows us to evaluate how well models estimate **true probabilities**, not just labels.
 
 ---
 
-## 💼 Decision-Making Framework
+### 🔹 3. Uncertainty & Decision-Making
 
-We extend the model into a **risk-aware decision system**:
+Using the Bayesian Neural Network, we quantify predictive uncertainty via Monte Carlo sampling.
 
-* ✅ Low risk → Accept transaction
-* ⚠ Medium risk + high uncertainty → Flag for human review
-* ❌ High risk → Block transaction
+We analyze:
 
-This demonstrates how uncertainty can be translated into **real business value**.
+* Relationship between uncertainty and classification errors
+* Distribution of uncertainty across fraud vs non-fraud
+* Detection of ambiguous cases
+
+#### Decision framework
+
+We propose a **risk-aware decision system**:
+
+| Risk Level                             | Decision |
+| -------------------------------------- | -------- |
+| Low probability + low uncertainty      | ✅ Accept |
+| Medium probability or high uncertainty | ⚠ Review |
+| High probability + low uncertainty     | ❌ Block  |
+
+👉 This connects probabilistic modeling with **real-world operational decisions**.
+
+---
+
+### 🔹 4. Latent Structure Analysis (GP-LVM)
+
+To explore hidden patterns in fraudulent behavior, we apply a **Gaussian Process Latent Variable Model (GP-LVM)**.
+
+#### Objective
+
+Identify whether fraudulent transactions exhibit **latent structure** not observable in the original feature space.
+
+#### Approach
+
+* Apply GP-LVM on:
+
+  * all fraud cases, or
+  * fraud + stratified sample of non-fraud
+* Learn a low-dimensional latent space (e.g., 2D)
+
+#### Analysis
+
+* Cluster structure of fraud cases
+* Relationship between latent regions and:
+
+  * transaction amount
+  * time patterns
+  * model uncertainty
+  * classification errors
+
+👉 This provides a **probabilistic interpretation of fraud heterogeneity**.
+
+---
+
+## 📊 Dataset
+
+We use the **Credit Card Fraud Detection dataset**:
+
+* ~284,807 transactions
+* 28 anonymized PCA features + Amount + Time
+* Highly imbalanced fraud distribution
+
+---
+
+## 🧠 Key Research Questions
+
+1. Do Bayesian models improve probability calibration compared to deterministic models?
+2. Is uncertainty informative for identifying difficult or ambiguous fraud cases?
+3. Can latent variable models reveal hidden structure in fraudulent behavior?
+4. How does probabilistic modeling impact decision-making under risk?
 
 ---
 
 ## ⚙️ Tech Stack
 
-* **PyTorch** (core deep learning framework)
-* **Pyro** (probabilistic programming for Bayesian models)
-* **Scikit-learn / XGBoost / LightGBM** (baselines)
-* **MLflow** (experiment tracking)
-* **Streamlit** (interactive demo)
+* **PyTorch** — Deep learning
+* **Pyro** — Probabilistic programming
+* **Scikit-learn** — Baselines
+* **XGBoost / LightGBM** — Boosting models
+* **properscoring** — Probabilistic metrics
+* **GPyTorch / GPflow** — Gaussian Processes / GP-LVM
+* **MLflow** — Experiment tracking
+* **Streamlit** — Interactive demo
 
 ---
 
 ## 📁 Project Structure
 
-```
+```bash
 .
-├── data/                # Dataset (or download instructions)
+├── data/                  # Dataset (or download instructions)
 ├── src/
-│   ├── data.py         # Data loading and preprocessing
+│   ├── data.py           # Preprocessing & loading
 │   ├── models/
 │   │   ├── baseline.py
 │   │   ├── bnn.py
+│   │   ├── gplvm.py
 │   ├── train/
 │   │   ├── train_baseline.py
 │   │   ├── train_bnn.py
-│   ├── evaluate.py
+│   ├── evaluation/
+│   │   ├── metrics.py
+│   │   ├── calibration.py
+│   ├── analysis/
+│   │   ├── uncertainty.py
+│   │   ├── latent_space.py
 │   ├── utils.py
-├── notebooks/          # Exploratory analysis
-├── reports/            # Proposal and final report
-├── app/                # Streamlit demo
+├── notebooks/            # Exploratory analysis
+├── reports/              # Proposal & final report
+├── app/                  # Streamlit demo
 ├── requirements.txt
 └── README.md
 ```
@@ -128,31 +187,37 @@ This demonstrates how uncertainty can be translated into **real business value**
 
 ## 🚀 How to Run
 
-### 1. Install dependencies
+### Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Train baseline models
+### Train baseline models
 
 ```bash
 python src/train/train_baseline.py
 ```
 
-### 3. Train Bayesian Neural Network
+### Train Bayesian Neural Network
 
 ```bash
 python src/train/train_bnn.py
 ```
 
-### 4. Evaluate models
+### Evaluate models
 
 ```bash
-python src/evaluate.py
+python src/evaluation/run_evaluation.py
 ```
 
-### 5. Launch demo
+### Run GP-LVM analysis
+
+```bash
+python src/analysis/latent_space.py
+```
+
+### Launch demo
 
 ```bash
 streamlit run app/app.py
@@ -162,28 +227,26 @@ streamlit run app/app.py
 
 ## 📈 Expected Contributions
 
-This project aims to show that:
+This project aims to demonstrate that:
 
-* Deterministic models may achieve strong classification performance
-* Bayesian models provide **better-calibrated probabilities**
-* Uncertainty enables **more robust decision-making**
-
-👉 The key insight:
-
-> *The best model is not only the most accurate, but the one that knows when it is uncertain.*
+* Deterministic models may excel in **classification performance**
+* Bayesian models provide better **uncertainty estimation and calibration**
+* Proper scoring rules are essential for evaluating probabilistic models
+* Latent variable models can uncover **hidden fraud patterns**
+* Combining prediction + uncertainty leads to **better decision-making systems**
 
 ---
 
 ## 🔬 Future Work
 
-* Hierarchical Bayesian models (user-level structure)
-* Latent variable models (e.g., GP-LVM)
+* Hierarchical Bayesian models (if group structure available)
 * Fully Bayesian hyperparameter marginalization
-* Deployment in real-time decision systems
+* Integration with real-time fraud detection pipelines
+* Advanced latent models (Deep GP, VAE)
 
 ---
 
-## 👤 Authors
+## 👤 Author
 
 Antonio Lorenzo Díaz-Meco
 Javier Ríos Montes
