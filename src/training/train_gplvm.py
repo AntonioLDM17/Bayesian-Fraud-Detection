@@ -10,21 +10,31 @@ import numpy as np
 import torch
 from sklearn.decomposition import PCA
 
+from src.config import (
+    DATA_PATH,
+    DEVICE,
+    GPLVM_CHECKPOINT_PATH,
+    GPLVM_LATENT_CSV_PATH,
+    GPLVM_LATENT_DIM,
+    GPLVM_LATENT_REG_WEIGHT,
+    GPLVM_LEARNING_RATE,
+    GPLVM_MAX_NONFRAUD,
+    GPLVM_NONFRAUD_MULTIPLIER,
+    GPLVM_NUM_EPOCHS,
+    GPLVM_PREPROCESSOR_PATH,
+    GPLVM_PRINT_EVERY,
+    GPLVM_RESULTS_DIR,
+    GPLVM_SOURCE_SPLIT,
+    GPLVM_TRAINING_SUMMARY_PATH,
+    LATENT_PLOT_DPI,
+    RANDOM_STATE,
+    TARGET_COLUMN,
+)
 from src.data.load_data import load_data
 from src.data.preprocess import build_standard_preprocessor, get_feature_columns
 from src.data.split import split_dataframe, sample_fraud_focused_subset
 from src.models.gplvm import GPLVM
-
-
-RANDOM_STATE = 42
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-
-def set_seed(seed: int = RANDOM_STATE) -> None:
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+from src.utils.seed import set_seed
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -65,7 +75,7 @@ def plot_latent_space(
     plt.title(title)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(output_path, dpi=220)
+    plt.savefig(output_path, dpi=LATENT_PLOT_DPI)
     plt.close()
 
 
@@ -87,17 +97,17 @@ def plot_latent_by_amount(
     cbar = plt.colorbar(scatter)
     cbar.set_label("Amount")
     plt.tight_layout()
-    plt.savefig(output_path, dpi=220)
+    plt.savefig(output_path, dpi=LATENT_PLOT_DPI)
     plt.close()
 
 
 def train_gplvm(
     Y: np.ndarray,
-    latent_dim: int = 2,
-    num_epochs: int = 1500,
-    learning_rate: float = 0.03,
-    latent_reg_weight: float = 1e-3,
-    print_every: int = 50,
+    latent_dim: int = GPLVM_LATENT_DIM,
+    num_epochs: int = GPLVM_NUM_EPOCHS,
+    learning_rate: float = GPLVM_LEARNING_RATE,
+    latent_reg_weight: float = GPLVM_LATENT_REG_WEIGHT,
+    print_every: int = GPLVM_PRINT_EVERY,
 ) -> tuple[GPLVM, dict[str, Any]]:
     """
     Train deterministic GPLVM by maximizing marginal likelihood.
@@ -169,21 +179,21 @@ def train_gplvm(
 
 
 def train_and_save(
-    data_path: str | Path = "data/raw/creditcard.csv",
-    output_dir: str | Path = "experiments/gplvm_results",
+    data_path: str | Path = DATA_PATH,
+    output_dir: str | Path = GPLVM_RESULTS_DIR,
 ) -> dict[str, Any]:
     """
     Train GPLVM on a TEST-split subset and save latent embeddings + plots.
     """
-    set_seed()
+    set_seed(RANDOM_STATE)
     output_dir = ensure_dir(output_dir)
 
     df = load_data(data_path, add_row_id=True)
     frames = split_dataframe(df)
     subset_df = sample_fraud_focused_subset(
         frames.test_df,
-        nonfraud_multiplier=3,
-        max_nonfraud=1500,
+        nonfraud_multiplier=GPLVM_NONFRAUD_MULTIPLIER,
+        max_nonfraud=GPLVM_MAX_NONFRAUD,
     )
 
     feature_cols = get_feature_columns(subset_df.columns)
@@ -193,16 +203,16 @@ def train_and_save(
     Y = preprocessor.fit_transform(Y_raw).astype(np.float32)
 
     print(f"Training GPLVM on TEST subset with shape: {Y.shape}")
-    print(f"Fraud count: {(subset_df['Class'] == 1).sum()}")
-    print(f"Non-fraud count: {(subset_df['Class'] == 0).sum()}")
+    print(f"Fraud count: {(subset_df[TARGET_COLUMN] == 1).sum()}")
+    print(f"Non-fraud count: {(subset_df[TARGET_COLUMN] == 0).sum()}")
 
     model, training_info = train_gplvm(
         Y=Y,
-        latent_dim=2,
-        num_epochs=1500,
-        learning_rate=0.03,
-        latent_reg_weight=1e-3,
-        print_every=50,
+        latent_dim=GPLVM_LATENT_DIM,
+        num_epochs=GPLVM_NUM_EPOCHS,
+        learning_rate=GPLVM_LEARNING_RATE,
+        latent_reg_weight=GPLVM_LATENT_REG_WEIGHT,
+        print_every=GPLVM_PRINT_EVERY,
     )
 
     latent_positions = model.get_latent_positions().cpu().numpy()
@@ -211,10 +221,10 @@ def train_and_save(
     latent_df["z1"] = latent_positions[:, 0]
     latent_df["z2"] = latent_positions[:, 1]
 
-    checkpoint_path = output_dir / "gplvm.pt"
-    preprocessor_path = output_dir / "preprocessor.joblib"
-    latent_csv_path = output_dir / "latent_embeddings.csv"
-    summary_json_path = output_dir / "training_summary.json"
+    checkpoint_path = output_dir / Path(GPLVM_CHECKPOINT_PATH).name
+    preprocessor_path = output_dir / Path(GPLVM_PREPROCESSOR_PATH).name
+    latent_csv_path = output_dir / Path(GPLVM_LATENT_CSV_PATH).name
+    summary_json_path = output_dir / Path(GPLVM_TRAINING_SUMMARY_PATH).name
     plot_class_path = output_dir / "latent_space_by_class.png"
     plot_amount_path = output_dir / "latent_space_by_amount.png"
 
@@ -222,12 +232,12 @@ def train_and_save(
         {
             "model_state_dict": model.state_dict(),
             "input_shape": list(Y.shape),
-            "latent_dim": 2,
+            "latent_dim": GPLVM_LATENT_DIM,
             "training_info": training_info,
             "hyperparameters": model.get_hyperparameters(),
             "feature_columns": feature_cols,
             "row_ids": latent_df["row_id"].tolist(),
-            "source_split": "test",
+            "source_split": GPLVM_SOURCE_SPLIT,
         },
         checkpoint_path,
     )
@@ -237,15 +247,15 @@ def train_and_save(
 
     summary = {
         "subset_size": int(len(subset_df)),
-        "fraud_count": int((subset_df["Class"] == 1).sum()),
-        "nonfraud_count": int((subset_df["Class"] == 0).sum()),
+        "fraud_count": int((subset_df[TARGET_COLUMN] == 1).sum()),
+        "nonfraud_count": int((subset_df[TARGET_COLUMN] == 0).sum()),
         "training_info": training_info,
         "hyperparameters": model.get_hyperparameters(),
         "checkpoint_path": str(checkpoint_path),
         "preprocessor_path": str(preprocessor_path),
         "latent_csv_path": str(latent_csv_path),
         "row_id_included": True,
-        "source_split": "test",
+        "source_split": GPLVM_SOURCE_SPLIT,
     }
 
     with summary_json_path.open("w", encoding="utf-8") as f:
@@ -254,7 +264,7 @@ def train_and_save(
     plot_latent_space(
         latent_df=latent_df,
         output_path=plot_class_path,
-        color_column="Class",
+        color_column=TARGET_COLUMN,
         title="GPLVM latent space colored by fraud class",
     )
 

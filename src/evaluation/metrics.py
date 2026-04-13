@@ -12,6 +12,8 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+from src.config import DEFAULT_THRESHOLD
+
 
 def validate_inputs(y_true: np.ndarray, y_proba: np.ndarray) -> None:
     """Validate classification metric inputs."""
@@ -25,7 +27,7 @@ def validate_inputs(y_true: np.ndarray, y_proba: np.ndarray) -> None:
         raise ValueError("Predicted probabilities must be in [0, 1].")
 
 
-def proba_to_labels(y_proba: np.ndarray, threshold: float = 0.5) -> np.ndarray:
+def proba_to_labels(y_proba: np.ndarray, threshold: float = DEFAULT_THRESHOLD) -> np.ndarray:
     """Convert probabilities into binary predictions."""
     if not 0.0 <= threshold <= 1.0:
         raise ValueError("Threshold must be in [0, 1].")
@@ -36,7 +38,7 @@ def proba_to_labels(y_proba: np.ndarray, threshold: float = 0.5) -> np.ndarray:
 def classification_metrics(
     y_true: np.ndarray,
     y_proba: np.ndarray,
-    threshold: float = 0.5,
+    threshold: float = DEFAULT_THRESHOLD,
 ) -> dict[str, float]:
     """
     Compute core classification metrics for binary fraud detection.
@@ -65,7 +67,7 @@ def classification_metrics(
 def confusion_counts(
     y_true: np.ndarray,
     y_proba: np.ndarray,
-    threshold: float = 0.5,
+    threshold: float = DEFAULT_THRESHOLD,
 ) -> dict[str, int]:
     """
     Return confusion matrix counts for a given threshold.
@@ -86,7 +88,7 @@ def confusion_counts(
 def evaluate_binary_classifier(
     y_true: np.ndarray,
     y_proba: np.ndarray,
-    threshold: float = 0.5,
+    threshold: float = DEFAULT_THRESHOLD,
 ) -> dict[str, Any]:
     """
     Full evaluation wrapper for a binary classifier.

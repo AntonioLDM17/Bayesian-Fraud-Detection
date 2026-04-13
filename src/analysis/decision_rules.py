@@ -6,6 +6,17 @@ from typing import Any
 
 import pandas as pd
 
+from src.config import (
+    BLOCK_PROBABILITY_THRESHOLD,
+    BNN_DECISION_DIR,
+    DEFAULT_THRESHOLD,
+    DECISION_CSV_PATH,
+    DECISION_SUMMARY_PATH,
+    REVIEW_PROBABILITY_THRESHOLD,
+    UNCERTAINTY_CSV_PATH,
+    UNCERTAINTY_THRESHOLD,
+)
+
 
 def ensure_dir(path: str | Path) -> Path:
     """Create directory if it does not exist."""
@@ -17,9 +28,9 @@ def ensure_dir(path: str | Path) -> Path:
 def assign_decision(
     probability: float,
     uncertainty: float,
-    block_probability_threshold: float = 0.80,
-    review_probability_threshold: float = 0.30,
-    uncertainty_threshold: float = 0.10,
+    block_probability_threshold: float = BLOCK_PROBABILITY_THRESHOLD,
+    review_probability_threshold: float = REVIEW_PROBABILITY_THRESHOLD,
+    uncertainty_threshold: float = UNCERTAINTY_THRESHOLD,
 ) -> str:
     """
     Decision policy using both predicted fraud probability and uncertainty.
@@ -32,7 +43,7 @@ def assign_decision(
     if probability >= block_probability_threshold and uncertainty <= uncertainty_threshold:
         return "BLOCK"
 
-    if probability >= 0.50 and uncertainty > uncertainty_threshold:
+    if probability >= DEFAULT_THRESHOLD and uncertainty > uncertainty_threshold:
         return "REVIEW"
 
     if probability >= review_probability_threshold:
@@ -43,9 +54,9 @@ def assign_decision(
 
 def add_decisions(
     df: pd.DataFrame,
-    block_probability_threshold: float = 0.80,
-    review_probability_threshold: float = 0.30,
-    uncertainty_threshold: float = 0.10,
+    block_probability_threshold: float = BLOCK_PROBABILITY_THRESHOLD,
+    review_probability_threshold: float = REVIEW_PROBABILITY_THRESHOLD,
+    uncertainty_threshold: float = UNCERTAINTY_THRESHOLD,
 ) -> pd.DataFrame:
     """Add decision column to per-sample uncertainty dataframe."""
     df = df.copy()
@@ -97,11 +108,11 @@ def summarize_decisions(df: pd.DataFrame) -> dict[str, Any]:
 
 
 def run_decision_analysis(
-    uncertainty_csv_path: str | Path = "experiments/bnn_results/uncertainty_analysis/test_uncertainty_per_sample.csv",
-    output_dir: str | Path = "experiments/bnn_results/decision_analysis",
-    block_probability_threshold: float = 0.80,
-    review_probability_threshold: float = 0.30,
-    uncertainty_threshold: float = 0.10,
+    uncertainty_csv_path: str | Path = UNCERTAINTY_CSV_PATH,
+    output_dir: str | Path = BNN_DECISION_DIR,
+    block_probability_threshold: float = BLOCK_PROBABILITY_THRESHOLD,
+    review_probability_threshold: float = REVIEW_PROBABILITY_THRESHOLD,
+    uncertainty_threshold: float = UNCERTAINTY_THRESHOLD,
 ) -> dict[str, Any]:
     """
     Apply uncertainty-aware decision policy to per-sample BNN outputs.
@@ -143,8 +154,8 @@ def run_decision_analysis(
     }
     summary["row_id_included"] = row_id_present
 
-    csv_out = output_dir / "test_decisions_per_sample.csv"
-    json_out = output_dir / "test_decision_summary.json"
+    csv_out = output_dir / Path(DECISION_CSV_PATH).name
+    json_out = output_dir / Path(DECISION_SUMMARY_PATH).name
 
     df_decisions.to_csv(csv_out, index=False)
 

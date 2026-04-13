@@ -90,6 +90,34 @@ USE_LIGHTGBM: bool = False
 
 
 # ============================================================
+# Baseline model hyperparameters
+# ============================================================
+
+LOGISTIC_MAX_ITER: int = 2000
+RF_N_ESTIMATORS: int = 300
+RF_MAX_DEPTH: int | None = None
+RF_MIN_SAMPLES_SPLIT: int = 2
+RF_MIN_SAMPLES_LEAF: int = 1
+
+
+# ============================================================
+# Boosting model hyperparameters
+# ============================================================
+
+XGB_N_ESTIMATORS: int = 300
+XGB_MAX_DEPTH: int = 5
+XGB_LEARNING_RATE: float = 0.05
+XGB_SUBSAMPLE: float = 0.8
+XGB_COLSAMPLE_BYTREE: float = 0.8
+
+LGBM_N_ESTIMATORS: int = 300
+LGBM_LEARNING_RATE: float = 0.05
+LGBM_NUM_LEAVES: int = 31
+LGBM_SUBSAMPLE: float = 0.8
+LGBM_COLSAMPLE_BYTREE: float = 0.8
+
+
+# ============================================================
 # Bayesian Neural Network configuration
 # ============================================================
 

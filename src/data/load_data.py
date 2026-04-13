@@ -4,9 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-
-TARGET_COLUMN = "Class"
-ROW_ID_COLUMN = "row_id"
+from src.config import ROW_ID_COLUMN, TARGET_COLUMN
 
 
 def load_data(

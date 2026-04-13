@@ -9,6 +9,16 @@ import numpy as np
 import pyro
 import torch
 
+from src.config import (
+    BNN_PREPROCESSOR_PATH,
+    DATA_PATH,
+    DEFAULT_BNN_MC_SAMPLES,
+    DEFAULT_MODEL_DIRS,
+    DEFAULT_N_BINS,
+    DEFAULT_THRESHOLD,
+    DEVICE,
+    FULL_EVALUATION_PATH,
+)
 from src.data.load_data import load_data
 from src.data.preprocess import get_feature_columns
 from src.data.split import split_features_target
@@ -16,9 +26,6 @@ from src.evaluation.calibration import calibration_metrics, calibration_table
 from src.evaluation.metrics import evaluate_binary_classifier
 from src.evaluation.proper_scoring import probabilistic_metrics
 from src.models.bnn import BayesianMLP, predict_proba_mc
-
-
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -31,8 +38,8 @@ def ensure_dir(path: str | Path) -> Path:
 def evaluate_probabilities(
     y_true: np.ndarray,
     y_proba: np.ndarray,
-    threshold: float = 0.5,
-    n_bins: int = 10,
+    threshold: float = DEFAULT_THRESHOLD,
+    n_bins: int = DEFAULT_N_BINS,
 ) -> dict[str, Any]:
     """Compute full evaluation from probabilities."""
     classification = evaluate_binary_classifier(
@@ -70,8 +77,8 @@ def evaluate_sklearn_model(
     model_path: str | Path,
     X,
     y,
-    threshold: float = 0.5,
-    n_bins: int = 10,
+    threshold: float = DEFAULT_THRESHOLD,
+    n_bins: int = DEFAULT_N_BINS,
 ) -> dict[str, Any]:
     """Load a saved sklearn model and compute full evaluation."""
     model = joblib.load(model_path)
@@ -143,9 +150,9 @@ def evaluate_bnn_model(
     preprocessor_path: str | Path,
     X,
     y,
-    threshold: float = 0.5,
-    n_bins: int = 10,
-    num_mc_samples: int = 100,
+    threshold: float = DEFAULT_THRESHOLD,
+    n_bins: int = DEFAULT_N_BINS,
+    num_mc_samples: int = DEFAULT_BNN_MC_SAMPLES,
 ) -> dict[str, Any]:
     """
     Evaluate saved BNN checkpoint using Monte Carlo predictive probabilities.
@@ -218,7 +225,7 @@ def collect_model_artifacts(model_dirs: list[str | Path]) -> list[dict[str, Any]
             model_name = checkpoint_path.stem
             qualified_name = f"{group_name}/{model_name}"
 
-            preprocessor_path = model_dir / "preprocessor.joblib"
+            preprocessor_path = model_dir / Path(BNN_PREPROCESSOR_PATH).name
             if not preprocessor_path.exists():
                 print(
                     "Warning: found BNN checkpoint but missing preprocessor.joblib in "
@@ -242,9 +249,9 @@ def evaluate_artifact(
     artifact: dict[str, Any],
     X,
     y,
-    threshold: float = 0.5,
-    n_bins: int = 10,
-    bnn_mc_samples: int = 100,
+    threshold: float = DEFAULT_THRESHOLD,
+    n_bins: int = DEFAULT_N_BINS,
+    bnn_mc_samples: int = DEFAULT_BNN_MC_SAMPLES,
 ) -> dict[str, Any]:
     """
     Evaluate one collected artifact according to its type.
@@ -292,22 +299,18 @@ def print_summary(model_name: str, split_name: str, results: dict[str, Any]) -> 
 
 
 def evaluate_all_models(
-    data_path: str | Path = "data/raw/creditcard.csv",
+    data_path: str | Path = DATA_PATH,
     model_dirs: list[str | Path] | None = None,
-    output_path: str | Path = "experiments/full_evaluation.json",
-    threshold: float = 0.5,
-    n_bins: int = 10,
-    bnn_mc_samples: int = 100,
+    output_path: str | Path = FULL_EVALUATION_PATH,
+    threshold: float = DEFAULT_THRESHOLD,
+    n_bins: int = DEFAULT_N_BINS,
+    bnn_mc_samples: int = DEFAULT_BNN_MC_SAMPLES,
 ) -> dict[str, Any]:
     """
     Evaluate all saved models from one or more directories on validation and test splits.
     """
     if model_dirs is None:
-        model_dirs = [
-            "experiments/baseline_results",
-            "experiments/boosting_results",
-            "experiments/bnn_results",
-        ]
+        model_dirs = DEFAULT_MODEL_DIRS
 
     output_path = Path(output_path)
     ensure_dir(output_path.parent)
