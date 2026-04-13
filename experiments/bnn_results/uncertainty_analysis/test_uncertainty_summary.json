@@ -1,48 +1,48 @@
 {
   "overall": {
     "num_samples": 56962,
-    "mean_probability": 0.11603932827711105,
-    "mean_uncertainty": 0.12013265490531921,
-    "median_uncertainty": 0.09804127365350723
+    "mean_probability": 0.11481458693742752,
+    "mean_uncertainty": 0.11848723888397217,
+    "median_uncertainty": 0.09611601382493973
   },
   "by_true_class": {
     "0": {
       "count": 56864,
-      "mean_probability": 0.11467884480953217,
-      "mean_uncertainty": 0.12023836374282837,
-      "median_uncertainty": 0.09813928604125977
+      "mean_probability": 0.11345183849334717,
+      "mean_uncertainty": 0.11858459562063217,
+      "median_uncertainty": 0.0961948111653328
     },
     "1": {
       "count": 98,
-      "mean_probability": 0.9054491519927979,
-      "mean_uncertainty": 0.0587959811091423,
-      "median_uncertainty": 0.011318995617330074
+      "mean_probability": 0.9055448174476624,
+      "mean_uncertainty": 0.06199708580970764,
+      "median_uncertainty": 0.013447439298033714
     }
   },
   "by_confusion_type": {
     "TP": {
       "count": 88,
-      "mean_probability": 0.9810279607772827,
-      "mean_uncertainty": 0.0413224957883358,
-      "median_uncertainty": 0.009718555957078934
+      "mean_probability": 0.9807628393173218,
+      "mean_uncertainty": 0.04497323930263519,
+      "median_uncertainty": 0.003930307924747467
     },
     "FP": {
-      "count": 1337,
-      "mean_probability": 0.6414139866828918,
-      "mean_uncertainty": 0.27351999282836914,
-      "median_uncertainty": 0.2623756229877472
+      "count": 1308,
+      "mean_probability": 0.6433683037757874,
+      "mean_uncertainty": 0.2712188959121704,
+      "median_uncertainty": 0.25986942648887634
     },
     "TN": {
-      "count": 55527,
-      "mean_probability": 0.10199591517448425,
-      "mean_uncertainty": 0.116547591984272,
-      "median_uncertainty": 0.0961516797542572
+      "count": 55556,
+      "mean_probability": 0.10097558051347733,
+      "mean_uncertainty": 0.11499098688364029,
+      "median_uncertainty": 0.09426611661911011
     },
     "FN": {
       "count": 10,
-      "mean_probability": 0.2403554916381836,
-      "mean_uncertainty": 0.21256263554096222,
-      "median_uncertainty": 0.24318361282348633
+      "mean_probability": 0.24362604320049286,
+      "mean_uncertainty": 0.2118070125579834,
+      "median_uncertainty": 0.2430368959903717
     }
   },
   "metadata": {
