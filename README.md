@@ -49,9 +49,7 @@ We compare deterministic and probabilistic approaches on the same fraud dataset.
 #### Deterministic models
 - Logistic Regression
 - Random Forest
-- Boosting models:
-  - XGBoost
-  - LightGBM
+- Boosting model: XGBoost
 
 #### Probabilistic model
 - Bayesian Neural Network (BNN) implemented with **Pyro + PyTorch**
@@ -178,7 +176,6 @@ The current implementation supports the following conclusions:
 - **Pyro**
 - **scikit-learn**
 - **XGBoost**
-- **LightGBM**
 - **NumPy / pandas**
 - **Matplotlib**
 
@@ -420,7 +417,6 @@ At the current stage, the repository already supports:
 
 The next natural improvements would be:
 
-* refining LightGBM configuration,
 * tuning decision thresholds on validation data,
 * strengthening the final report and visual presentation,
 * and optionally extending the project with hierarchical or deeper probabilistic models.
