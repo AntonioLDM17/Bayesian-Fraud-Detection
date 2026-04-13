@@ -11,71 +11,14 @@ import pandas as pd
 import pyro
 import torch
 from pyro.infer import Predictive
-from sklearn.model_selection import train_test_split
 
+from src.data.load_data import ROW_ID_COLUMN, load_data
+from src.data.preprocess import get_feature_columns
+from src.data.split import split_features_target
 from src.models.bnn import BayesianMLP
 
 
-RANDOM_STATE = 42
-TARGET_COLUMN = "Class"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-
-def load_data(csv_path: str | Path) -> pd.DataFrame:
-    """Load fraud dataset from CSV and preserve original row index."""
-    csv_path = Path(csv_path)
-    if not csv_path.exists():
-        raise FileNotFoundError(f"Dataset not found at: {csv_path}")
-
-    df = pd.read_csv(csv_path)
-
-    if TARGET_COLUMN not in df.columns:
-        raise ValueError(
-            f"Target column '{TARGET_COLUMN}' not found. "
-            f"Available columns: {list(df.columns)}"
-        )
-
-    # Preserve original row identity for downstream joins.
-    df = df.copy()
-    df["row_id"] = df.index
-
-    return df
-
-
-def split_data(
-    df: pd.DataFrame,
-    test_size: float = 0.2,
-    val_size: float = 0.2,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
-    """
-    Must match the split logic used in training/evaluation.
-
-    Note:
-    X keeps row_id so we can propagate it to outputs, but row_id must be
-    removed before feeding the model.
-    """
-    X = df.drop(columns=[TARGET_COLUMN])
-    y = df[TARGET_COLUMN].astype(int)
-
-    X_train_val, X_test, y_train_val, y_test = train_test_split(
-        X,
-        y,
-        test_size=test_size,
-        stratify=y,
-        random_state=RANDOM_STATE,
-    )
-
-    adjusted_val_size = val_size / (1.0 - test_size)
-
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train_val,
-        y_train_val,
-        test_size=adjusted_val_size,
-        stratify=y_train_val,
-        random_state=RANDOM_STATE,
-    )
-
-    return X_train, X_val, X_test, y_train, y_val, y_test
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -113,7 +56,7 @@ def _build_bnn_from_checkpoint(checkpoint: dict[str, Any]) -> BayesianMLP:
 def load_bnn_artifacts(
     checkpoint_path: str | Path,
     preprocessor_path: str | Path,
-) -> tuple[BayesianMLP, Any, Any]:
+) -> tuple[BayesianMLP, Any, Any, list[str] | None]:
     """
     Load BNN checkpoint and preprocessor.
     """
@@ -130,7 +73,9 @@ def load_bnn_artifacts(
     blocked_model = pyro.poutine.block(model, hide=["obs"])
     guide = pyro.infer.autoguide.AutoDiagonalNormal(blocked_model)
 
-    return model, guide, preprocessor
+    feature_names = checkpoint.get("feature_names")
+
+    return model, guide, preprocessor, feature_names
 
 
 @torch.no_grad()
@@ -145,8 +90,6 @@ def predict_with_uncertainty(
     Return:
     - predictive mean probability
     - predictive std of probability across MC samples
-
-    The std is a simple uncertainty proxy.
     """
     model.eval()
     x = x.to(DEVICE)
@@ -164,7 +107,7 @@ def predict_with_uncertainty(
             return_sites=["_RETURN"],
         )
         samples = predictive(batch_x)
-        logits_samples = samples["_RETURN"]  # [num_samples, batch]
+        logits_samples = samples["_RETURN"]
         prob_samples = torch.sigmoid(logits_samples)
 
         mean_probs = prob_samples.mean(dim=0)
@@ -311,33 +254,33 @@ def run_uncertainty_analysis(
     """
     output_dir = ensure_dir(output_dir)
 
-    df = load_data(data_path)
-    _, X_val, X_test, _, y_val, y_test = split_data(df)
+    df = load_data(data_path, add_row_id=True)
+    splits = split_features_target(df, drop_row_id_from_X=False)
 
     if split not in {"validation", "test"}:
         raise ValueError("split must be 'validation' or 'test'.")
 
     if split == "validation":
-        X_eval = X_val.copy()
-        y_eval = y_val
+        X_eval = splits.X_val.copy()
+        y_eval = splits.y_val
     else:
-        X_eval = X_test.copy()
-        y_eval = y_test
+        X_eval = splits.X_test.copy()
+        y_eval = splits.y_test
 
-    if "row_id" not in X_eval.columns:
-        raise ValueError("Expected 'row_id' column in X_eval but it was not found.")
+    if ROW_ID_COLUMN not in X_eval.columns:
+        raise ValueError(f"Expected '{ROW_ID_COLUMN}' column in X_eval but it was not found.")
 
-    row_ids = X_eval["row_id"].to_numpy()
+    row_ids = X_eval[ROW_ID_COLUMN].to_numpy()
 
-    # Remove row_id before applying the model preprocessor.
-    X_eval_features = X_eval.drop(columns=["row_id"])
-
-    model, guide, preprocessor = load_bnn_artifacts(
+    model, guide, preprocessor, feature_names = load_bnn_artifacts(
         checkpoint_path=checkpoint_path,
         preprocessor_path=preprocessor_path,
     )
 
-    X_transformed = preprocessor.transform(X_eval_features).astype(np.float32)
+    if feature_names is None:
+        feature_names = get_feature_columns(X_eval.columns, exclude_target=False, exclude_row_id=True)
+
+    X_transformed = preprocessor.transform(X_eval[feature_names]).astype(np.float32)
     X_tensor = torch.tensor(X_transformed, dtype=torch.float32, device=DEVICE)
 
     mean_probs, std_probs = predict_with_uncertainty(

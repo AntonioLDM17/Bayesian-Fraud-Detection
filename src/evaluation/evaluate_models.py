@@ -6,72 +6,19 @@ from typing import Any
 
 import joblib
 import numpy as np
-import pandas as pd
 import pyro
 import torch
 
+from src.data.load_data import load_data
+from src.data.preprocess import get_feature_columns
+from src.data.split import split_features_target
 from src.evaluation.calibration import calibration_metrics, calibration_table
 from src.evaluation.metrics import evaluate_binary_classifier
 from src.evaluation.proper_scoring import probabilistic_metrics
 from src.models.bnn import BayesianMLP, predict_proba_mc
 
 
-RANDOM_STATE = 42
-TARGET_COLUMN = "Class"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-
-def load_data(csv_path: str | Path) -> pd.DataFrame:
-    """Load fraud dataset from CSV."""
-    csv_path = Path(csv_path)
-    if not csv_path.exists():
-        raise FileNotFoundError(f"Dataset not found at: {csv_path}")
-
-    df = pd.read_csv(csv_path)
-
-    if TARGET_COLUMN not in df.columns:
-        raise ValueError(
-            f"Target column '{TARGET_COLUMN}' not found. "
-            f"Available columns: {list(df.columns)}"
-        )
-
-    return df
-
-
-def split_data(
-    df: pd.DataFrame,
-    test_size: float = 0.2,
-    val_size: float = 0.2,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
-    """
-    Split data into train/validation/test using stratification.
-
-    Must match the logic used during training.
-    """
-    from sklearn.model_selection import train_test_split
-
-    X = df.drop(columns=[TARGET_COLUMN])
-    y = df[TARGET_COLUMN].astype(int)
-
-    X_train_val, X_test, y_train_val, y_test = train_test_split(
-        X,
-        y,
-        test_size=test_size,
-        stratify=y,
-        random_state=RANDOM_STATE,
-    )
-
-    adjusted_val_size = val_size / (1.0 - test_size)
-
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train_val,
-        y_train_val,
-        test_size=adjusted_val_size,
-        stratify=y_train_val,
-        random_state=RANDOM_STATE,
-    )
-
-    return X_train, X_val, X_test, y_train, y_val, y_test
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -121,8 +68,8 @@ def evaluate_probabilities(
 
 def evaluate_sklearn_model(
     model_path: str | Path,
-    X: pd.DataFrame,
-    y: pd.Series,
+    X,
+    y,
     threshold: float = 0.5,
     n_bins: int = 10,
 ) -> dict[str, Any]:
@@ -150,29 +97,22 @@ def _build_bnn_from_checkpoint(checkpoint: dict[str, Any]) -> BayesianMLP:
     prior_scale = checkpoint["prior_scale"]
 
     if "hidden_dim_1" in checkpoint and "hidden_dim_2" in checkpoint:
-        hidden_dim_1 = checkpoint["hidden_dim_1"]
-        hidden_dim_2 = checkpoint["hidden_dim_2"]
-        dropout_rate = checkpoint.get("dropout_rate", 0.1)
-
-        model = BayesianMLP(
+        return BayesianMLP(
             input_dim=input_dim,
-            hidden_dim_1=hidden_dim_1,
-            hidden_dim_2=hidden_dim_2,
+            hidden_dim_1=checkpoint["hidden_dim_1"],
+            hidden_dim_2=checkpoint["hidden_dim_2"],
             prior_scale=prior_scale,
-            dropout_rate=dropout_rate,
+            dropout_rate=checkpoint.get("dropout_rate", 0.1),
         )
-        return model
 
-    # Backward compatibility with older checkpoints
     hidden_dim = checkpoint["hidden_dim"]
-    model = BayesianMLP(
+    return BayesianMLP(
         input_dim=input_dim,
         hidden_dim_1=hidden_dim,
         hidden_dim_2=max(hidden_dim // 2, 16),
         prior_scale=prior_scale,
         dropout_rate=0.0,
     )
-    return model
 
 
 def load_bnn_artifacts(
@@ -201,8 +141,8 @@ def load_bnn_artifacts(
 def evaluate_bnn_model(
     checkpoint_path: str | Path,
     preprocessor_path: str | Path,
-    X: pd.DataFrame,
-    y: pd.Series,
+    X,
+    y,
     threshold: float = 0.5,
     n_bins: int = 10,
     num_mc_samples: int = 100,
@@ -215,7 +155,13 @@ def evaluate_bnn_model(
         preprocessor_path=preprocessor_path,
     )
 
-    X_transformed = preprocessor.transform(X).astype(np.float32)
+    checkpoint = torch.load(checkpoint_path, map_location=DEVICE, weights_only=False)
+    feature_names = checkpoint.get("feature_names")
+
+    if feature_names is None:
+        feature_names = get_feature_columns(X.columns, exclude_target=False, exclude_row_id=True)
+
+    X_transformed = preprocessor.transform(X[feature_names]).astype(np.float32)
     X_tensor = torch.tensor(X_transformed, dtype=torch.float32, device=DEVICE)
 
     y_proba = predict_proba_mc(
@@ -294,8 +240,8 @@ def collect_model_artifacts(model_dirs: list[str | Path]) -> list[dict[str, Any]
 
 def evaluate_artifact(
     artifact: dict[str, Any],
-    X: pd.DataFrame,
-    y: pd.Series,
+    X,
+    y,
     threshold: float = 0.5,
     n_bins: int = 10,
     bnn_mc_samples: int = 100,
@@ -366,8 +312,13 @@ def evaluate_all_models(
     output_path = Path(output_path)
     ensure_dir(output_path.parent)
 
-    df = load_data(data_path)
-    _, X_val, X_test, _, y_val, y_test = split_data(df)
+    df = load_data(data_path, add_row_id=True)
+    splits = split_features_target(df, drop_row_id_from_X=True)
+
+    X_val = splits.X_val
+    X_test = splits.X_test
+    y_val = splits.y_val
+    y_test = splits.y_test
 
     collected_artifacts = collect_model_artifacts(model_dirs)
     if not collected_artifacts:

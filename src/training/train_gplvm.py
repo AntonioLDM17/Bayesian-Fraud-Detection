@@ -7,19 +7,16 @@ from typing import Any
 import joblib
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import torch
 from sklearn.decomposition import PCA
-from sklearn.impute import SimpleImputer
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
+from src.data.load_data import load_data
+from src.data.preprocess import build_standard_preprocessor, get_feature_columns
+from src.data.split import split_dataframe, sample_fraud_focused_subset
 from src.models.gplvm import GPLVM
 
 
 RANDOM_STATE = 42
-TARGET_COLUMN = "Class"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -30,109 +27,10 @@ def set_seed(seed: int = RANDOM_STATE) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
-def load_data(csv_path: str | Path) -> pd.DataFrame:
-    """
-    Load dataset and preserve original row identity.
-    """
-    csv_path = Path(csv_path)
-    if not csv_path.exists():
-        raise FileNotFoundError(f"Dataset not found at: {csv_path}")
-
-    df = pd.read_csv(csv_path)
-
-    if TARGET_COLUMN not in df.columns:
-        raise ValueError(
-            f"Target column '{TARGET_COLUMN}' not found. "
-            f"Available columns: {list(df.columns)}"
-        )
-
-    df = df.copy()
-    df["row_id"] = df.index
-
-    return df
-
-
-def split_dataframes(
-    df: pd.DataFrame,
-    test_size: float = 0.2,
-    val_size: float = 0.2,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-    Split full dataframe into train / validation / test using the same logic
-    as the rest of the project.
-
-    Returns full dataframes, not just X/y separately.
-    """
-    train_val_df, test_df = train_test_split(
-        df,
-        test_size=test_size,
-        stratify=df[TARGET_COLUMN],
-        random_state=RANDOM_STATE,
-    )
-
-    adjusted_val_size = val_size / (1.0 - test_size)
-
-    train_df, val_df = train_test_split(
-        train_val_df,
-        test_size=adjusted_val_size,
-        stratify=train_val_df[TARGET_COLUMN],
-        random_state=RANDOM_STATE,
-    )
-
-    return train_df.reset_index(drop=True), val_df.reset_index(drop=True), test_df.reset_index(drop=True)
-
-
 def ensure_dir(path: str | Path) -> Path:
     path = Path(path)
     path.mkdir(parents=True, exist_ok=True)
     return path
-
-
-def build_preprocessor() -> Pipeline:
-    return Pipeline(
-        steps=[
-            ("imputer", SimpleImputer(strategy="median")),
-            ("scaler", StandardScaler()),
-        ]
-    )
-
-
-def sample_latent_dataset_from_test(
-    test_df: pd.DataFrame,
-    nonfraud_multiplier: int = 3,
-    max_nonfraud: int | None = 1500,
-) -> pd.DataFrame:
-    """
-    Build a manageable GPLVM subset from the TEST split only.
-
-    Strategy:
-    - include all fraud cases from test
-    - include a sample of non-fraud cases from test
-
-    This ensures the latent space is aligned with the same evaluation split
-    used by uncertainty.py and decision_rules.py.
-    """
-    fraud_df = test_df[test_df[TARGET_COLUMN] == 1].copy()
-    nonfraud_df = test_df[test_df[TARGET_COLUMN] == 0].copy()
-
-    n_fraud = len(fraud_df)
-    n_nonfraud_target = n_fraud * nonfraud_multiplier
-
-    if max_nonfraud is not None:
-        n_nonfraud_target = min(n_nonfraud_target, max_nonfraud)
-
-    n_nonfraud_target = min(n_nonfraud_target, len(nonfraud_df))
-
-    sampled_nonfraud = nonfraud_df.sample(
-        n=n_nonfraud_target,
-        random_state=RANDOM_STATE,
-        replace=False,
-    )
-
-    subset = pd.concat([fraud_df, sampled_nonfraud], axis=0)
-    subset = subset.sample(frac=1.0, random_state=RANDOM_STATE).reset_index(drop=True)
-
-    return subset
 
 
 def make_pca_initialization(Y: np.ndarray, latent_dim: int = 2) -> np.ndarray:
@@ -144,7 +42,7 @@ def make_pca_initialization(Y: np.ndarray, latent_dim: int = 2) -> np.ndarray:
 
 
 def plot_latent_space(
-    latent_df: pd.DataFrame,
+    latent_df,
     output_path: Path,
     color_column: str,
     title: str,
@@ -172,7 +70,7 @@ def plot_latent_space(
 
 
 def plot_latent_by_amount(
-    latent_df: pd.DataFrame,
+    latent_df,
     output_path: Path,
 ) -> None:
     plt.figure(figsize=(8, 6))
@@ -276,34 +174,27 @@ def train_and_save(
 ) -> dict[str, Any]:
     """
     Train GPLVM on a TEST-split subset and save latent embeddings + plots.
-
-    This is adapted to align the GPLVM universe with the BNN uncertainty and
-    decision analysis, which are also computed on the test split.
     """
     set_seed()
     output_dir = ensure_dir(output_dir)
 
-    df = load_data(data_path)
-    _, _, test_df = split_dataframes(df)
-
-    subset_df = sample_latent_dataset_from_test(
-        test_df=test_df,
+    df = load_data(data_path, add_row_id=True)
+    frames = split_dataframe(df)
+    subset_df = sample_fraud_focused_subset(
+        frames.test_df,
         nonfraud_multiplier=3,
         max_nonfraud=1500,
     )
 
-    # Keep row_id for future merges, but do not use it as an input feature.
-    excluded_cols = {TARGET_COLUMN, "row_id"}
-    feature_cols = [col for col in subset_df.columns if col not in excluded_cols]
-
+    feature_cols = get_feature_columns(subset_df.columns)
     Y_raw = subset_df[feature_cols].copy()
 
-    preprocessor = build_preprocessor()
+    preprocessor = build_standard_preprocessor(feature_cols)
     Y = preprocessor.fit_transform(Y_raw).astype(np.float32)
 
     print(f"Training GPLVM on TEST subset with shape: {Y.shape}")
-    print(f"Fraud count: {(subset_df[TARGET_COLUMN] == 1).sum()}")
-    print(f"Non-fraud count: {(subset_df[TARGET_COLUMN] == 0).sum()}")
+    print(f"Fraud count: {(subset_df['Class'] == 1).sum()}")
+    print(f"Non-fraud count: {(subset_df['Class'] == 0).sum()}")
 
     model, training_info = train_gplvm(
         Y=Y,
@@ -346,8 +237,8 @@ def train_and_save(
 
     summary = {
         "subset_size": int(len(subset_df)),
-        "fraud_count": int((subset_df[TARGET_COLUMN] == 1).sum()),
-        "nonfraud_count": int((subset_df[TARGET_COLUMN] == 0).sum()),
+        "fraud_count": int((subset_df["Class"] == 1).sum()),
+        "nonfraud_count": int((subset_df["Class"] == 0).sum()),
         "training_info": training_info,
         "hyperparameters": model.get_hyperparameters(),
         "checkpoint_path": str(checkpoint_path),
@@ -363,7 +254,7 @@ def train_and_save(
     plot_latent_space(
         latent_df=latent_df,
         output_path=plot_class_path,
-        color_column=TARGET_COLUMN,
+        color_column="Class",
         title="GPLVM latent space colored by fraud class",
     )
 

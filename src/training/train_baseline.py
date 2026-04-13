@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 import joblib
-import pandas as pd
 from sklearn.metrics import (
     average_precision_score,
     f1_score,
@@ -13,64 +12,11 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import train_test_split
 
+from src.data.load_data import load_data
+from src.data.preprocess import get_feature_columns
+from src.data.split import split_features_target
 from src.models.baseline import build_baseline_models
-
-
-RANDOM_STATE = 42
-TARGET_COLUMN = "Class"
-
-
-def load_data(csv_path: str | Path) -> pd.DataFrame:
-    """Load fraud dataset from CSV."""
-    csv_path = Path(csv_path)
-    if not csv_path.exists():
-        raise FileNotFoundError(f"Dataset not found at: {csv_path}")
-
-    df = pd.read_csv(csv_path)
-
-    if TARGET_COLUMN not in df.columns:
-        raise ValueError(
-            f"Target column '{TARGET_COLUMN}' not found. "
-            f"Available columns: {list(df.columns)}"
-        )
-
-    return df
-
-
-def split_data(
-    df: pd.DataFrame,
-    test_size: float = 0.2,
-    val_size: float = 0.2,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
-    """
-    Split data into train/validation/test using stratification.
-
-    val_size is relative to the train+val temporary split.
-    """
-    X = df.drop(columns=[TARGET_COLUMN])
-    y = df[TARGET_COLUMN].astype(int)
-
-    X_train_val, X_test, y_train_val, y_test = train_test_split(
-        X,
-        y,
-        test_size=test_size,
-        stratify=y,
-        random_state=RANDOM_STATE,
-    )
-
-    adjusted_val_size = val_size / (1.0 - test_size)
-
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train_val,
-        y_train_val,
-        test_size=adjusted_val_size,
-        stratify=y_train_val,
-        random_state=RANDOM_STATE,
-    )
-
-    return X_train, X_val, X_test, y_train, y_val, y_test
 
 
 def evaluate_model(model, X, y, threshold: float = 0.5) -> dict[str, float]:
@@ -103,10 +49,17 @@ def train_and_save(
     """Train baseline models, evaluate them, and save outputs."""
     output_dir = ensure_dir(output_dir)
 
-    df = load_data(data_path)
-    X_train, X_val, X_test, y_train, y_val, y_test = split_data(df)
+    df = load_data(data_path, add_row_id=True)
+    splits = split_features_target(df, drop_row_id_from_X=True)
 
-    feature_names = list(X_train.columns)
+    X_train = splits.X_train
+    X_val = splits.X_val
+    X_test = splits.X_test
+    y_train = splits.y_train
+    y_val = splits.y_val
+    y_test = splits.y_test
+
+    feature_names = get_feature_columns(X_train.columns, exclude_target=False, exclude_row_id=True)
     models = build_baseline_models(feature_names)
 
     all_results: dict[str, Any] = {}
