@@ -7,8 +7,14 @@ from typing import Any
 import matplotlib.pyplot as plt
 import pandas as pd
 
-
-TARGET_COLUMN = "Class"
+from src.config import (
+    DECISION_CSV_PATH,
+    GPLVM_LATENT_ANALYSIS_DIR,
+    GPLVM_LATENT_CSV_PATH,
+    LATENT_PLOT_DPI,
+    TARGET_COLUMN,
+    UNCERTAINTY_CSV_PATH,
+)
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -100,7 +106,7 @@ def plot_latent_by_class(
     plt.title("GPLVM latent space colored by fraud class")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(output_path, dpi=220)
+    plt.savefig(output_path, dpi=LATENT_PLOT_DPI)
     plt.close()
 
 
@@ -125,7 +131,7 @@ def plot_latent_by_amount(
     cbar = plt.colorbar(scatter)
     cbar.set_label("Amount")
     plt.tight_layout()
-    plt.savefig(output_path, dpi=220)
+    plt.savefig(output_path, dpi=LATENT_PLOT_DPI)
     plt.close()
 
 
@@ -154,7 +160,7 @@ def plot_latent_by_uncertainty(
     cbar = plt.colorbar(scatter)
     cbar.set_label("Predictive uncertainty (std)")
     plt.tight_layout()
-    plt.savefig(output_path, dpi=220)
+    plt.savefig(output_path, dpi=LATENT_PLOT_DPI)
     plt.close()
 
 
@@ -185,7 +191,7 @@ def plot_latent_by_confusion_type(
     plt.title("GPLVM latent space colored by BNN confusion type")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(output_path, dpi=220)
+    plt.savefig(output_path, dpi=LATENT_PLOT_DPI)
     plt.close()
 
 
@@ -216,7 +222,7 @@ def plot_latent_by_decision(
     plt.title("GPLVM latent space colored by uncertainty-aware decision")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(output_path, dpi=220)
+    plt.savefig(output_path, dpi=LATENT_PLOT_DPI)
     plt.close()
 
 
@@ -268,10 +274,10 @@ def summarize_latent_space(df: pd.DataFrame) -> dict[str, Any]:
 
 
 def run_latent_analysis(
-    latent_csv_path: str | Path = "experiments/gplvm_results/latent_embeddings.csv",
-    uncertainty_csv_path: str | Path | None = "experiments/bnn_results/uncertainty_analysis/test_uncertainty_per_sample.csv",
-    decision_csv_path: str | Path | None = "experiments/bnn_results/decision_analysis/test_decisions_per_sample.csv",
-    output_dir: str | Path = "experiments/gplvm_results/latent_analysis",
+    latent_csv_path: str | Path = GPLVM_LATENT_CSV_PATH,
+    uncertainty_csv_path: str | Path | None = UNCERTAINTY_CSV_PATH,
+    decision_csv_path: str | Path | None = DECISION_CSV_PATH,
+    output_dir: str | Path = GPLVM_LATENT_ANALYSIS_DIR,
 ) -> dict[str, Any]:
     """
     Analyze GPLVM latent embeddings and enrich them with

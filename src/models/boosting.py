@@ -5,13 +5,23 @@ from typing import Any
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 
-from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
+from xgboost import XGBClassifier
 
-
-RANDOM_STATE = 42
+from src.config import (
+    LGBM_COLSAMPLE_BYTREE,
+    LGBM_LEARNING_RATE,
+    LGBM_N_ESTIMATORS,
+    LGBM_NUM_LEAVES,
+    LGBM_SUBSAMPLE,
+    RANDOM_STATE,
+    XGB_COLSAMPLE_BYTREE,
+    XGB_LEARNING_RATE,
+    XGB_MAX_DEPTH,
+    XGB_N_ESTIMATORS,
+    XGB_SUBSAMPLE,
+)
 
 
 def build_preprocessor(feature_names: list[str]) -> ColumnTransformer:
@@ -44,11 +54,11 @@ def build_xgboost_pipeline(feature_names: list[str], scale_pos_weight: float) ->
     preprocessor = build_preprocessor(feature_names)
 
     xgb_model = XGBClassifier(
-        n_estimators=300,
-        max_depth=5,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
+        n_estimators=XGB_N_ESTIMATORS,
+        max_depth=XGB_MAX_DEPTH,
+        learning_rate=XGB_LEARNING_RATE,
+        subsample=XGB_SUBSAMPLE,
+        colsample_bytree=XGB_COLSAMPLE_BYTREE,
         objective="binary:logistic",
         eval_metric="logloss",
         scale_pos_weight=scale_pos_weight,
@@ -73,11 +83,11 @@ def build_lightgbm_pipeline(feature_names: list[str], scale_pos_weight: float) -
     preprocessor = build_preprocessor(feature_names)
 
     lgbm_model = LGBMClassifier(
-        n_estimators=300,
-        learning_rate=0.05,
-        num_leaves=31,
-        subsample=0.8,
-        colsample_bytree=0.8,
+        n_estimators=LGBM_N_ESTIMATORS,
+        learning_rate=LGBM_LEARNING_RATE,
+        num_leaves=LGBM_NUM_LEAVES,
+        subsample=LGBM_SUBSAMPLE,
+        colsample_bytree=LGBM_COLSAMPLE_BYTREE,
         objective="binary",
         scale_pos_weight=scale_pos_weight,
         random_state=RANDOM_STATE,

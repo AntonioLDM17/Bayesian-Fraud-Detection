@@ -8,6 +8,14 @@ import torch.nn as nn
 from pyro.infer import Predictive
 from pyro.nn import PyroModule, PyroSample
 
+from src.config import (
+    BNN_DROPOUT_RATE,
+    BNN_HIDDEN_DIM_1,
+    BNN_HIDDEN_DIM_2,
+    BNN_PRIOR_SCALE,
+    DEFAULT_BNN_MC_SAMPLES,
+    DEVICE,
+)
 
 class BayesianMLP(PyroModule):
     """
@@ -22,10 +30,10 @@ class BayesianMLP(PyroModule):
     def __init__(
         self,
         input_dim: int,
-        hidden_dim_1: int = 128,
-        hidden_dim_2: int = 64,
-        prior_scale: float = 0.5,
-        dropout_rate: float = 0.1,
+        hidden_dim_1: int = BNN_HIDDEN_DIM_1,
+        hidden_dim_2: int = BNN_HIDDEN_DIM_2,
+        prior_scale: float = BNN_PRIOR_SCALE,
+        dropout_rate: float = BNN_DROPOUT_RATE,
     ):
         super().__init__()
 
@@ -101,9 +109,9 @@ def predict_proba_mc(
     model: BayesianMLP,
     guide,
     x: torch.Tensor,
-    num_samples: int = 100,
+    num_samples: int = DEFAULT_BNN_MC_SAMPLES,
     batch_size: int = 4096,
-    device: str = "cpu",
+    device: str = DEVICE,
 ) -> np.ndarray:
     """
     Monte Carlo predictive probabilities for binary classification.

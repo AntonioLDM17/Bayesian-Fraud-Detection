@@ -21,23 +21,32 @@ from sklearn.metrics import (
 )
 from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 
+from src.config import (
+    BNN_BATCH_SIZE,
+    BNN_CHECKPOINT_PATH,
+    BNN_DROPOUT_RATE,
+    BNN_EARLY_STOPPING_PATIENCE,
+    BNN_EVAL_MC_SAMPLES,
+    BNN_HIDDEN_DIM_1,
+    BNN_HIDDEN_DIM_2,
+    BNN_LEARNING_RATE,
+    BNN_METRICS_PATH,
+    BNN_MIN_DELTA,
+    BNN_NUM_EPOCHS,
+    BNN_PREPROCESSOR_PATH,
+    BNN_PRIOR_SCALE,
+    BNN_RESULTS_DIR,
+    BNN_TRAIN_MC_SAMPLES,
+    DATA_PATH,
+    DEFAULT_THRESHOLD,
+    DEVICE,
+    RANDOM_STATE,
+)
 from src.data.load_data import load_data
 from src.data.preprocess import build_standard_preprocessor, get_feature_columns
 from src.data.split import split_features_target
 from src.models.bnn import BayesianMLP, predict_proba_mc
-
-
-RANDOM_STATE = 42
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-
-def set_seed(seed: int = RANDOM_STATE) -> None:
-    """Set all relevant random seeds."""
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    pyro.set_rng_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
+from src.utils.seed import set_seed
 
 
 def make_weighted_dataloader(
@@ -72,7 +81,7 @@ def make_weighted_dataloader(
 def evaluate_probabilities(
     y_true: np.ndarray,
     y_proba: np.ndarray,
-    threshold: float = 0.5,
+    threshold: float = DEFAULT_THRESHOLD,
 ) -> dict[str, float]:
     """Evaluate probability predictions."""
     y_pred = (y_proba >= threshold).astype(int)
@@ -98,16 +107,16 @@ def train_bnn(
     y_train: np.ndarray,
     X_val: np.ndarray,
     y_val: np.ndarray,
-    hidden_dim_1: int = 128,
-    hidden_dim_2: int = 64,
-    prior_scale: float = 0.5,
-    dropout_rate: float = 0.1,
-    learning_rate: float = 5e-4,
-    num_epochs: int = 80,
-    batch_size: int = 512,
-    num_mc_samples: int = 100,
-    early_stopping_patience: int = 15,
-    min_delta: float = 5e-4,
+    hidden_dim_1: int = BNN_HIDDEN_DIM_1,
+    hidden_dim_2: int = BNN_HIDDEN_DIM_2,
+    prior_scale: float = BNN_PRIOR_SCALE,
+    dropout_rate: float = BNN_DROPOUT_RATE,
+    learning_rate: float = BNN_LEARNING_RATE,
+    num_epochs: int = BNN_NUM_EPOCHS,
+    batch_size: int = BNN_BATCH_SIZE,
+    num_mc_samples: int = BNN_TRAIN_MC_SAMPLES,
+    early_stopping_patience: int = BNN_EARLY_STOPPING_PATIENCE,
+    min_delta: float = BNN_MIN_DELTA,
 ) -> tuple[BayesianMLP, AutoDiagonalNormal, dict[str, Any]]:
     """
     Train Bayesian Neural Network with Pyro SVI using early stopping on validation PR-AUC.
@@ -222,12 +231,12 @@ def train_bnn(
 
 def train_and_save(
     data_path: str | Path,
-    output_dir: str | Path = "experiments/bnn_results",
+    output_dir: str | Path = BNN_RESULTS_DIR,
 ) -> dict[str, Any]:
     """
     Train BNN, evaluate it, and save the best checkpoint + preprocessing.
     """
-    set_seed()
+    set_seed(RANDOM_STATE)
     output_dir = ensure_dir(output_dir)
 
     df = load_data(data_path, add_row_id=True)
@@ -251,17 +260,17 @@ def train_and_save(
     y_val_np = y_val.to_numpy(dtype=np.int64)
     y_test_np = y_test.to_numpy(dtype=np.int64)
 
-    hidden_dim_1 = 128
-    hidden_dim_2 = 64
-    prior_scale = 0.5
-    dropout_rate = 0.1
-    learning_rate = 5e-4
-    num_epochs = 80
-    batch_size = 512
-    train_mc_samples = 100
-    eval_mc_samples = 200
-    early_stopping_patience = 15
-    min_delta = 5e-4
+    hidden_dim_1 = BNN_HIDDEN_DIM_1
+    hidden_dim_2 = BNN_HIDDEN_DIM_2
+    prior_scale = BNN_PRIOR_SCALE
+    dropout_rate = BNN_DROPOUT_RATE
+    learning_rate = BNN_LEARNING_RATE
+    num_epochs = BNN_NUM_EPOCHS
+    batch_size = BNN_BATCH_SIZE
+    train_mc_samples = BNN_TRAIN_MC_SAMPLES
+    eval_mc_samples = BNN_EVAL_MC_SAMPLES
+    early_stopping_patience = BNN_EARLY_STOPPING_PATIENCE
+    min_delta = BNN_MIN_DELTA
 
     print("\nTraining bayesian_neural_network...")
     model, guide, training_info = train_bnn(
@@ -310,9 +319,9 @@ def train_and_save(
     for metric_name, metric_value in test_metrics.items():
         print(f"  {metric_name}: {metric_value:.4f}")
 
-    checkpoint_path = output_dir / "bayesian_neural_network.pt"
-    preprocessor_path = output_dir / "preprocessor.joblib"
-    metrics_path = output_dir / "metrics.json"
+    checkpoint_path = output_dir / Path(BNN_CHECKPOINT_PATH).name
+    preprocessor_path = output_dir / Path(BNN_PREPROCESSOR_PATH).name
+    metrics_path = output_dir / Path(BNN_METRICS_PATH).name
 
     torch.save(
         {
@@ -361,5 +370,4 @@ def train_and_save(
 
 
 if __name__ == "__main__":
-    DATA_PATH = "data/raw/creditcard.csv"
     train_and_save(DATA_PATH)

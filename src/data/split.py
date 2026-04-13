@@ -5,10 +5,8 @@ from dataclasses import dataclass
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from src.config import DEFAULT_TEST_SIZE, DEFAULT_VAL_SIZE, RANDOM_STATE
 from src.data.load_data import ROW_ID_COLUMN, TARGET_COLUMN
-
-
-RANDOM_STATE = 42
 
 
 @dataclass
@@ -30,8 +28,8 @@ class SplitArrays:
 
 def split_dataframe(
     df: pd.DataFrame,
-    test_size: float = 0.2,
-    val_size: float = 0.2,
+    test_size: float = DEFAULT_TEST_SIZE,
+    val_size: float = DEFAULT_VAL_SIZE,
     random_state: int = RANDOM_STATE,
 ) -> SplitFrames:
     """
@@ -75,8 +73,8 @@ def split_dataframe(
 
 def split_features_target(
     df: pd.DataFrame,
-    test_size: float = 0.2,
-    val_size: float = 0.2,
+    test_size: float = DEFAULT_TEST_SIZE,
+    val_size: float = DEFAULT_VAL_SIZE,
     random_state: int = RANDOM_STATE,
     drop_row_id_from_X: bool = False,
 ) -> SplitArrays:

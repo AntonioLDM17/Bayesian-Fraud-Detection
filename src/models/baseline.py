@@ -7,8 +7,14 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-
-RANDOM_STATE = 42
+from src.config import (
+    LOGISTIC_MAX_ITER,
+    RANDOM_STATE,
+    RF_MAX_DEPTH,
+    RF_MIN_SAMPLES_LEAF,
+    RF_MIN_SAMPLES_SPLIT,
+    RF_N_ESTIMATORS,
+)
 
 
 def build_preprocessor(feature_names: list[str]) -> ColumnTransformer:
@@ -40,7 +46,7 @@ def build_baseline_models(feature_names: list[str]) -> dict[str, Pipeline]:
                 "classifier",
                 LogisticRegression(
                     class_weight="balanced",
-                    max_iter=2000,
+                    max_iter=LOGISTIC_MAX_ITER,
                     random_state=RANDOM_STATE,
                 ),
             ),
@@ -53,10 +59,10 @@ def build_baseline_models(feature_names: list[str]) -> dict[str, Pipeline]:
             (
                 "classifier",
                 RandomForestClassifier(
-                    n_estimators=300,
-                    max_depth=None,
-                    min_samples_split=2,
-                    min_samples_leaf=1,
+                    n_estimators=RF_N_ESTIMATORS,
+                    max_depth=RF_MAX_DEPTH,
+                    min_samples_split=RF_MIN_SAMPLES_SPLIT,
+                    min_samples_leaf=RF_MIN_SAMPLES_LEAF,
                     class_weight="balanced",
                     random_state=RANDOM_STATE,
                     n_jobs=-1,

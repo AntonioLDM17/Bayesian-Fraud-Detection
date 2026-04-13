@@ -12,13 +12,20 @@ import pyro
 import torch
 from pyro.infer import Predictive
 
+from src.config import (
+    BNN_CHECKPOINT_PATH,
+    BNN_PREPROCESSOR_PATH,
+    BNN_UNCERTAINTY_DIR,
+    DATA_PATH,
+    DEFAULT_BNN_UNCERTAINTY_MC_SAMPLES,
+    DEFAULT_THRESHOLD,
+    DEVICE,
+    PLOT_DPI,
+)
 from src.data.load_data import ROW_ID_COLUMN, load_data
 from src.data.preprocess import get_feature_columns
 from src.data.split import split_features_target
 from src.models.bnn import BayesianMLP
-
-
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -202,7 +209,7 @@ def plot_uncertainty_by_true_class(df: pd.DataFrame, output_path: Path) -> None:
     plt.title("Uncertainty distribution by true class")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(output_path, dpi=200)
+    plt.savefig(output_path, dpi=PLOT_DPI)
     plt.close()
 
 
@@ -216,7 +223,7 @@ def plot_uncertainty_by_confusion_type(df: pd.DataFrame, output_path: Path) -> N
     plt.ylabel("Predictive uncertainty (std of MC probabilities)")
     plt.title("Uncertainty by confusion type")
     plt.tight_layout()
-    plt.savefig(output_path, dpi=200)
+    plt.savefig(output_path, dpi=PLOT_DPI)
     plt.close()
 
 
@@ -233,18 +240,18 @@ def plot_probability_vs_uncertainty(df: pd.DataFrame, output_path: Path) -> None
     plt.ylabel("Predictive uncertainty (std)")
     plt.title("Predicted probability vs uncertainty")
     plt.tight_layout()
-    plt.savefig(output_path, dpi=200)
+    plt.savefig(output_path, dpi=PLOT_DPI)
     plt.close()
 
 
 def run_uncertainty_analysis(
-    data_path: str | Path = "data/raw/creditcard.csv",
-    checkpoint_path: str | Path = "experiments/bnn_results/bayesian_neural_network.pt",
-    preprocessor_path: str | Path = "experiments/bnn_results/preprocessor.joblib",
-    output_dir: str | Path = "experiments/bnn_results/uncertainty_analysis",
+    data_path: str | Path = DATA_PATH,
+    checkpoint_path: str | Path = BNN_CHECKPOINT_PATH,
+    preprocessor_path: str | Path = BNN_PREPROCESSOR_PATH,
+    output_dir: str | Path = BNN_UNCERTAINTY_DIR,
     split: str = "test",
-    threshold: float = 0.5,
-    num_mc_samples: int = 200,
+    threshold: float = DEFAULT_THRESHOLD,
+    num_mc_samples: int = DEFAULT_BNN_UNCERTAINTY_MC_SAMPLES,
 ) -> dict[str, Any]:
     """
     Run uncertainty analysis for the trained BNN.

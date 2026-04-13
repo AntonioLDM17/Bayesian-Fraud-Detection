@@ -13,6 +13,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+from src.config import BOOSTING_RESULTS_DIR, DATA_PATH, DEFAULT_THRESHOLD
 from src.data.load_data import load_data
 from src.data.preprocess import get_feature_columns
 from src.data.split import split_features_target
@@ -33,7 +34,7 @@ def compute_scale_pos_weight(y_train) -> float:
     return negative_count / positive_count
 
 
-def evaluate_model(model, X, y, threshold: float = 0.5) -> dict[str, float]:
+def evaluate_model(model, X, y, threshold: float = DEFAULT_THRESHOLD) -> dict[str, float]:
     """Evaluate model on a dataset."""
     y_proba = model.predict_proba(X)[:, 1]
     y_pred = (y_proba >= threshold).astype(int)
@@ -58,7 +59,7 @@ def ensure_dir(path: str | Path) -> Path:
 
 def train_and_save(
     data_path: str | Path,
-    output_dir: str | Path = "experiments/boosting_results",
+    output_dir: str | Path = BOOSTING_RESULTS_DIR,
 ) -> dict[str, Any]:
     """
     Train boosting models, evaluate them, and save outputs.
@@ -121,5 +122,4 @@ def train_and_save(
 
 
 if __name__ == "__main__":
-    DATA_PATH = "data/raw/creditcard.csv"
     train_and_save(DATA_PATH)
