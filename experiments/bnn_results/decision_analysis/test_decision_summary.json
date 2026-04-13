@@ -1,28 +1,28 @@
 {
   "row_id_included": true,
   "decision_counts": {
-    "ACCEPT": 52142,
-    "REVIEW": 4730,
-    "BLOCK": 90
+    "ACCEPT": 52117,
+    "REVIEW": 4753,
+    "BLOCK": 92
   },
   "by_decision": {
     "ACCEPT": {
-      "count": 52142,
-      "fraud_rate": 0.00013424878217176172,
-      "mean_probability": 0.08290622514495609,
-      "mean_uncertainty": 0.10450944022867938
+      "count": 52117,
+      "fraud_rate": 0.00015350077709768404,
+      "mean_probability": 0.08271097341434848,
+      "mean_uncertainty": 0.10463158759532398
     },
     "REVIEW": {
-      "count": 4730,
-      "fraud_rate": 0.0040169133192389005,
-      "mean_probability": 0.44976700486469345,
-      "mean_uncertainty": 0.2744700365562368
+      "count": 4753,
+      "fraud_rate": 0.0031559015358720807,
+      "mean_probability": 0.45211389120345047,
+      "mean_uncertainty": 0.27360912063665055
     },
     "BLOCK": {
-      "count": 90,
-      "fraud_rate": 0.8,
-      "mean_probability": 0.9974897143333333,
-      "mean_uncertainty": 0.018837967458530447
+      "count": 92,
+      "fraud_rate": 0.8152173913043478,
+      "mean_probability": 0.9972629011956521,
+      "mean_uncertainty": 0.021857897636106956
     }
   },
   "policy": {

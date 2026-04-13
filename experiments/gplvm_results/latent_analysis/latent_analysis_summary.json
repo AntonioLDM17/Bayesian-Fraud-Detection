@@ -54,25 +54,25 @@
     "FP": 8
   },
   "decision_counts": {
-    "ACCEPT": 275,
-    "BLOCK": 72,
-    "REVIEW": 45
+    "ACCEPT": 276,
+    "BLOCK": 75,
+    "REVIEW": 41
   },
   "uncertainty_summary": {
-    "mean_uncertainty": 0.10334299129322383,
-    "median_uncertainty": 0.082601723,
+    "mean_uncertainty": 0.10393080972788962,
+    "median_uncertainty": 0.0823628925,
     "matched_rows": 392
   },
   "uncertainty_by_class": {
     "0": {
       "count": 294,
-      "mean_uncertainty": 0.11712495831632655,
-      "median_uncertainty": 0.091375966
+      "mean_uncertainty": 0.11726277957482992,
+      "median_uncertainty": 0.09335286300000001
     },
     "1": {
       "count": 98,
-      "mean_uncertainty": 0.06199709022391572,
-      "median_uncertainty": 0.013447439
+      "mean_uncertainty": 0.06393490018706867,
+      "median_uncertainty": 0.021493289
     }
   },
   "notes": [
