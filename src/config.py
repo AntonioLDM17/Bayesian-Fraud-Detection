@@ -110,13 +110,6 @@ XGB_LEARNING_RATE: float = 0.05
 XGB_SUBSAMPLE: float = 0.8
 XGB_COLSAMPLE_BYTREE: float = 0.8
 
-LGBM_N_ESTIMATORS: int = 300
-LGBM_LEARNING_RATE: float = 0.05
-LGBM_NUM_LEAVES: int = 31
-LGBM_SUBSAMPLE: float = 0.8
-LGBM_COLSAMPLE_BYTREE: float = 0.8
-
-
 # ============================================================
 # Bayesian Neural Network configuration
 # ============================================================

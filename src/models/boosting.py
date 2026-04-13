@@ -6,15 +6,9 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 
-from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 
 from src.config import (
-    LGBM_COLSAMPLE_BYTREE,
-    LGBM_LEARNING_RATE,
-    LGBM_N_ESTIMATORS,
-    LGBM_NUM_LEAVES,
-    LGBM_SUBSAMPLE,
     RANDOM_STATE,
     XGB_COLSAMPLE_BYTREE,
     XGB_LEARNING_RATE,
@@ -76,34 +70,6 @@ def build_xgboost_pipeline(feature_names: list[str], scale_pos_weight: float) ->
     return pipeline
 
 
-def build_lightgbm_pipeline(feature_names: list[str], scale_pos_weight: float) -> Pipeline:
-    """
-    Build LightGBM pipeline for imbalanced fraud detection.
-    """
-    preprocessor = build_preprocessor(feature_names)
-
-    lgbm_model = LGBMClassifier(
-        n_estimators=LGBM_N_ESTIMATORS,
-        learning_rate=LGBM_LEARNING_RATE,
-        num_leaves=LGBM_NUM_LEAVES,
-        subsample=LGBM_SUBSAMPLE,
-        colsample_bytree=LGBM_COLSAMPLE_BYTREE,
-        objective="binary",
-        scale_pos_weight=scale_pos_weight,
-        random_state=RANDOM_STATE,
-        n_jobs=-1,
-        verbosity=-1,
-    )
-
-    pipeline = Pipeline(
-        steps=[
-            ("preprocessor", preprocessor),
-            ("classifier", lgbm_model),
-        ]
-    )
-
-    return pipeline
-
 
 def build_boosting_models(
     feature_names: list[str],
@@ -114,10 +80,6 @@ def build_boosting_models(
     """
     return {
         "xgboost": build_xgboost_pipeline(
-            feature_names=feature_names,
-            scale_pos_weight=scale_pos_weight,
-        ),
-        "lightgbm": build_lightgbm_pipeline(
             feature_names=feature_names,
             scale_pos_weight=scale_pos_weight,
         ),

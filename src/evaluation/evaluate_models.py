@@ -15,7 +15,6 @@ from src.config import (
     DEFAULT_BNN_MC_SAMPLES,
     DEFAULT_MODEL_DIRS,
     DEFAULT_N_BINS,
-    DEFAULT_THRESHOLD,
     DEVICE,
     FULL_EVALUATION_PATH,
 )
@@ -25,6 +24,7 @@ from src.data.split import split_features_target
 from src.evaluation.calibration import calibration_metrics, calibration_table
 from src.evaluation.metrics import evaluate_binary_classifier
 from src.evaluation.proper_scoring import probabilistic_metrics
+from src.evaluation.thresholds import find_best_f1_threshold
 from src.models.bnn import BayesianMLP, predict_proba_mc
 
 
@@ -38,10 +38,20 @@ def ensure_dir(path: str | Path) -> Path:
 def evaluate_probabilities(
     y_true: np.ndarray,
     y_proba: np.ndarray,
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
     n_bins: int = DEFAULT_N_BINS,
 ) -> dict[str, Any]:
-    """Compute full evaluation from probabilities."""
+    """
+    Compute full evaluation from probabilities.
+
+    If threshold is None, it is optimized on the provided y_true/y_proba pair
+    using maximum F1. This should only be done on validation data.
+    """
+    if threshold is None:
+        threshold, best_f1 = find_best_f1_threshold(y_true, y_proba)
+    else:
+        best_f1 = None
+
     classification = evaluate_binary_classifier(
         y_true=y_true,
         y_proba=y_proba,
@@ -65,19 +75,25 @@ def evaluate_probabilities(
         n_bins=n_bins,
     )
 
-    return {
+    result: dict[str, Any] = {
         "classification_metrics": classification,
         "proper_scoring_rules": scoring,
         "calibration_metrics": calibration,
         "calibration_table": calib_table,
+        "optimal_threshold": float(threshold),
     }
+
+    if best_f1 is not None:
+        result["best_f1_at_optimal_threshold"] = float(best_f1)
+
+    return result
 
 
 def evaluate_sklearn_model(
     model_path: str | Path,
     X,
     y,
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
     n_bins: int = DEFAULT_N_BINS,
 ) -> dict[str, Any]:
     """Load a saved sklearn model and compute full evaluation."""
@@ -150,7 +166,7 @@ def evaluate_bnn_model(
     preprocessor_path: str | Path,
     X,
     y,
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
     n_bins: int = DEFAULT_N_BINS,
     num_mc_samples: int = DEFAULT_BNN_MC_SAMPLES,
 ) -> dict[str, Any]:
@@ -166,7 +182,11 @@ def evaluate_bnn_model(
     feature_names = checkpoint.get("feature_names")
 
     if feature_names is None:
-        feature_names = get_feature_columns(X.columns, exclude_target=False, exclude_row_id=True)
+        feature_names = get_feature_columns(
+            X.columns,
+            exclude_target=False,
+            exclude_row_id=True,
+        )
 
     X_transformed = preprocessor.transform(X[feature_names]).astype(np.float32)
     X_tensor = torch.tensor(X_transformed, dtype=torch.float32, device=DEVICE)
@@ -249,7 +269,7 @@ def evaluate_artifact(
     artifact: dict[str, Any],
     X,
     y,
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
     n_bins: int = DEFAULT_N_BINS,
     bnn_mc_samples: int = DEFAULT_BNN_MC_SAMPLES,
 ) -> dict[str, Any]:
@@ -286,6 +306,7 @@ def print_summary(model_name: str, split_name: str, results: dict[str, Any]) -> 
     cls = results["classification_metrics"]
     prob = results["proper_scoring_rules"]
     cal = results["calibration_metrics"]
+    thr = results["optimal_threshold"]
 
     print(
         f"[{split_name}] {model_name} | "
@@ -294,7 +315,8 @@ def print_summary(model_name: str, split_name: str, results: dict[str, Any]) -> 
         f"Recall={cls['recall']:.4f} | "
         f"NLL={prob['nll']:.4f} | "
         f"Brier={prob['brier_score']:.4f} | "
-        f"ECE={cal['ece']:.4f}"
+        f"ECE={cal['ece']:.4f} | "
+        f"Thr={thr:.4f}"
     )
 
 
@@ -302,12 +324,16 @@ def evaluate_all_models(
     data_path: str | Path = DATA_PATH,
     model_dirs: list[str | Path] | None = None,
     output_path: str | Path = FULL_EVALUATION_PATH,
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
     n_bins: int = DEFAULT_N_BINS,
     bnn_mc_samples: int = DEFAULT_BNN_MC_SAMPLES,
 ) -> dict[str, Any]:
     """
     Evaluate all saved models from one or more directories on validation and test splits.
+
+    Logic:
+    - If threshold is provided, use that threshold for both validation and test.
+    - If threshold is None, tune it on validation and reuse it on test.
     """
     if model_dirs is None:
         model_dirs = DEFAULT_MODEL_DIRS
@@ -329,14 +355,19 @@ def evaluate_all_models(
             "No supported model artifacts found in any provided directory."
         )
 
+    metadata_threshold = None if threshold is None else float(threshold)
+
     results: dict[str, Any] = {
         "metadata": {
             "data_path": str(data_path),
-            "threshold": float(threshold),
+            "threshold": metadata_threshold,
             "n_bins": int(n_bins),
             "bnn_mc_samples": int(bnn_mc_samples),
             "model_dirs": [str(p) for p in model_dirs],
             "device": DEVICE,
+            "threshold_selection": (
+                "validation_optimized_f1" if threshold is None else "fixed_user_threshold"
+            ),
         },
         "models": {},
     }
@@ -347,6 +378,7 @@ def evaluate_all_models(
 
         print(f"Evaluating {qualified_name} ({artifact_type})...")
 
+        # Validation: tune threshold if threshold=None
         val_results = evaluate_artifact(
             artifact=artifact,
             X=X_val,
@@ -356,11 +388,14 @@ def evaluate_all_models(
             bnn_mc_samples=bnn_mc_samples,
         )
 
+        selected_threshold = float(val_results["optimal_threshold"])
+
+        # Test: always reuse validation-selected threshold
         test_results = evaluate_artifact(
             artifact=artifact,
             X=X_test,
             y=y_test,
-            threshold=threshold,
+            threshold=selected_threshold,
             n_bins=n_bins,
             bnn_mc_samples=bnn_mc_samples,
         )
@@ -370,6 +405,7 @@ def evaluate_all_models(
             "validation": val_results,
             "test": test_results,
             "model_path": str(artifact["model_path"]),
+            "selected_threshold_from_validation": selected_threshold,
         }
 
         if artifact_type == "bnn":

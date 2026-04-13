@@ -25,6 +25,7 @@ from src.config import (
 from src.data.load_data import ROW_ID_COLUMN, load_data
 from src.data.preprocess import get_feature_columns
 from src.data.split import split_features_target
+from src.evaluation.thresholds import find_best_f1_threshold
 from src.models.bnn import BayesianMLP
 
 
@@ -90,7 +91,7 @@ def predict_with_uncertainty(
     model: BayesianMLP,
     guide,
     x: torch.Tensor,
-    num_samples: int = 200,
+    num_samples: int = DEFAULT_BNN_UNCERTAINTY_MC_SAMPLES,
     batch_size: int = 4096,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -146,6 +147,72 @@ def assign_confusion_label(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray
             labels.append("UNKNOWN")
 
     return np.array(labels, dtype=object)
+
+
+def compute_coverage_risk(
+    df: pd.DataFrame,
+    uncertainty_col: str = "uncertainty_std",
+    num_thresholds: int = 50,
+) -> list[dict[str, float]]:
+    """
+    Compute coverage-risk tradeoff as uncertainty threshold increases.
+
+    Coverage = fraction of kept samples
+    Risk = error rate on kept samples
+    """
+    max_uncertainty = float(df[uncertainty_col].max())
+
+    if max_uncertainty == 0.0:
+        thresholds = np.array([0.0], dtype=float)
+    else:
+        thresholds = np.linspace(0.0, max_uncertainty, num_thresholds)
+
+    results: list[dict[str, float]] = []
+
+    for thr in thresholds:
+        subset = df[df[uncertainty_col] <= thr]
+
+        if len(subset) == 0:
+            continue
+
+        coverage = len(subset) / len(df)
+        risk = float((subset["y_pred"] != subset["y_true"]).mean())
+
+        results.append(
+            {
+                "uncertainty_threshold": float(thr),
+                "coverage": float(coverage),
+                "risk": risk,
+            }
+        )
+
+    return results
+
+
+def selective_metrics(
+    df: pd.DataFrame,
+    uncertainty_threshold: float,
+) -> dict[str, float | int | None]:
+    """
+    Evaluate performance on samples whose uncertainty is below a threshold.
+    """
+    subset = df[df["uncertainty_std"] <= uncertainty_threshold]
+
+    if len(subset) == 0:
+        return {
+            "coverage": 0.0,
+            "accuracy": None,
+            "num_samples": 0,
+        }
+
+    coverage = len(subset) / len(df)
+    accuracy = float((subset["y_pred"] == subset["y_true"]).mean())
+
+    return {
+        "coverage": float(coverage),
+        "accuracy": accuracy,
+        "num_samples": int(len(subset)),
+    }
 
 
 def summarize_uncertainty(df: pd.DataFrame) -> dict[str, Any]:
@@ -244,20 +311,66 @@ def plot_probability_vs_uncertainty(df: pd.DataFrame, output_path: Path) -> None
     plt.close()
 
 
+def plot_coverage_risk(results: list[dict[str, float]], output_path: Path) -> None:
+    """Plot coverage-risk curve."""
+    coverage = [r["coverage"] for r in results]
+    risk = [r["risk"] for r in results]
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(coverage, risk)
+    plt.xlabel("Coverage")
+    plt.ylabel("Risk (error rate)")
+    plt.title("Coverage vs Risk")
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=PLOT_DPI)
+    plt.close()
+
+
+def infer_threshold_from_validation(
+    model: BayesianMLP,
+    guide,
+    preprocessor,
+    feature_names: list[str],
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    num_mc_samples: int,
+) -> float:
+    """
+    Tune threshold on validation data using maximum F1.
+    """
+    X_val_transformed = preprocessor.transform(X_val[feature_names]).astype(np.float32)
+    X_val_tensor = torch.tensor(X_val_transformed, dtype=torch.float32, device=DEVICE)
+
+    y_val_proba = predict_with_uncertainty(
+        model=model,
+        guide=guide,
+        x=X_val_tensor,
+        num_samples=num_mc_samples,
+    )[0]
+
+    threshold, _ = find_best_f1_threshold(
+        y_true=y_val.to_numpy(dtype=np.int64),
+        y_proba=y_val_proba,
+    )
+    return float(threshold)
+
+
 def run_uncertainty_analysis(
     data_path: str | Path = DATA_PATH,
     checkpoint_path: str | Path = BNN_CHECKPOINT_PATH,
     preprocessor_path: str | Path = BNN_PREPROCESSOR_PATH,
     output_dir: str | Path = BNN_UNCERTAINTY_DIR,
     split: str = "test",
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float | None = None,
     num_mc_samples: int = DEFAULT_BNN_UNCERTAINTY_MC_SAMPLES,
 ) -> dict[str, Any]:
     """
     Run uncertainty analysis for the trained BNN.
 
-    Args:
-        split: 'validation' or 'test'
+    Logic:
+    - If threshold is provided, use it directly.
+    - If threshold is None and split='test', tune threshold on validation and apply to test.
+    - If threshold is None and split='validation', tune threshold on validation itself.
     """
     output_dir = ensure_dir(output_dir)
 
@@ -285,7 +398,23 @@ def run_uncertainty_analysis(
     )
 
     if feature_names is None:
-        feature_names = get_feature_columns(X_eval.columns, exclude_target=False, exclude_row_id=True)
+        feature_names = get_feature_columns(
+            X_eval.columns,
+            exclude_target=False,
+            exclude_row_id=True,
+        )
+
+    # Tune threshold on validation if not provided
+    if threshold is None:
+        threshold = infer_threshold_from_validation(
+            model=model,
+            guide=guide,
+            preprocessor=preprocessor,
+            feature_names=feature_names,
+            X_val=splits.X_val.copy(),
+            y_val=splits.y_val,
+            num_mc_samples=num_mc_samples,
+        )
 
     X_transformed = preprocessor.transform(X_eval[feature_names]).astype(np.float32)
     X_tensor = torch.tensor(X_transformed, dtype=torch.float32, device=DEVICE)
@@ -314,6 +443,18 @@ def run_uncertainty_analysis(
 
     summary = summarize_uncertainty(results_df)
 
+    coverage_risk_results = compute_coverage_risk(results_df)
+
+    max_uncertainty = float(results_df["uncertainty_std"].max())
+    selective_results: dict[str, Any] = {}
+    if max_uncertainty == 0.0:
+        threshold_grid = [0.0]
+    else:
+        threshold_grid = np.linspace(0.0, max_uncertainty, 20)
+
+    for thr in threshold_grid:
+        selective_results[f"{float(thr):.8f}"] = selective_metrics(results_df, float(thr))
+
     summary["metadata"] = {
         "split": split,
         "threshold": float(threshold),
@@ -322,28 +463,44 @@ def run_uncertainty_analysis(
         "checkpoint_path": str(checkpoint_path),
         "preprocessor_path": str(preprocessor_path),
         "row_id_included": True,
+        "threshold_selection": "validation_optimized_f1" if threshold is not None else "fixed_user_threshold",
     }
+    summary["coverage_risk"] = coverage_risk_results
+    summary["selective_prediction"] = selective_results
 
     csv_path = output_dir / f"{split}_uncertainty_per_sample.csv"
     json_path = output_dir / f"{split}_uncertainty_summary.json"
     hist_path = output_dir / f"{split}_uncertainty_by_true_class.png"
     boxplot_path = output_dir / f"{split}_uncertainty_by_confusion_type.png"
     scatter_path = output_dir / f"{split}_probability_vs_uncertainty.png"
+    coverage_risk_json_path = output_dir / f"{split}_coverage_risk.json"
+    coverage_risk_plot_path = output_dir / f"{split}_coverage_risk.png"
+    selective_json_path = output_dir / f"{split}_selective_prediction.json"
 
     results_df.to_csv(csv_path, index=False)
 
     with json_path.open("w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
+    with coverage_risk_json_path.open("w", encoding="utf-8") as f:
+        json.dump(coverage_risk_results, f, indent=2)
+
+    with selective_json_path.open("w", encoding="utf-8") as f:
+        json.dump(selective_results, f, indent=2)
+
     plot_uncertainty_by_true_class(results_df, hist_path)
     plot_uncertainty_by_confusion_type(results_df, boxplot_path)
     plot_probability_vs_uncertainty(results_df, scatter_path)
+    plot_coverage_risk(coverage_risk_results, coverage_risk_plot_path)
 
     print(f"Saved per-sample uncertainty CSV to: {csv_path}")
     print(f"Saved uncertainty summary JSON to: {json_path}")
     print(f"Saved histogram to: {hist_path}")
     print(f"Saved boxplot to: {boxplot_path}")
     print(f"Saved scatter plot to: {scatter_path}")
+    print(f"Saved coverage-risk JSON to: {coverage_risk_json_path}")
+    print(f"Saved coverage-risk plot to: {coverage_risk_plot_path}")
+    print(f"Saved selective prediction JSON to: {selective_json_path}")
 
     return summary
 
