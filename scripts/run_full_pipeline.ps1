@@ -16,36 +16,40 @@ if (!(Test-Path $DATA_PATH)) {
 Write-Host "✅ Dataset found"
 
 Write-Host ""
-Write-Host "[1/8] Training baseline models..."
+Write-Host "[1/9] Training baseline models..."
 python -m src.training.train_baseline
 
 Write-Host ""
-Write-Host "[2/8] Training boosting models..."
+Write-Host "[2/9] Training boosting models..."
 python -m src.training.train_boosting
 
 Write-Host ""
-Write-Host "[3/8] Training Bayesian Neural Network..."
+Write-Host "[3/9] Training Bayesian Neural Network..."
 python -m src.training.train_bnn
 
 Write-Host ""
-Write-Host "[4/8] Evaluating all models..."
+Write-Host "[4/9] Evaluating all models..."
 python -m src.evaluation.evaluate_models
 
 Write-Host ""
-Write-Host "[5/8] Running uncertainty analysis..."
+Write-Host "[5/9] Running uncertainty analysis..."
 python -m src.analysis.uncertainty
 
 Write-Host ""
-Write-Host "[6/8] Building uncertainty-aware decision rules..."
+Write-Host "[6/9] Building uncertainty-aware decision rules..."
 python -m src.analysis.decision_rules
 
 Write-Host ""
-Write-Host "[7/8] Training GP-LVM..."
+Write-Host "[7/9] Training GP-LVM..."
 python -m src.training.train_gplvm
 
 Write-Host ""
-Write-Host "[8/8] Running latent analysis..."
+Write-Host "[8/9] Running latent analysis..."
 python -m src.analysis.latent_analysis
+
+Write-Host ""
+Write-Host "[9/9] Running coverage analysis..."
+python -m src.analysis.coverage_analysis
 
 Write-Host ""
 Write-Host "========================================"

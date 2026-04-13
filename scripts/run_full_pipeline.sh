@@ -17,37 +17,40 @@ fi
 echo "✅ Dataset found"
 
 echo ""
-echo "[1/8] Training baseline models..."
+echo "[1/9] Training baseline models..."
 python.exe -m src.training.train_baseline
 
 echo ""
-echo "[2/8] Training boosting models..."
+echo "[2/9] Training boosting models..."
 python.exe -m src.training.train_boosting
 
 echo ""
-echo "[3/8] Training Bayesian Neural Network..."
+echo "[3/9] Training Bayesian Neural Network..."
 python.exe -m src.training.train_bnn
 
 echo ""
-echo "[4/8] Evaluating all models..."
+echo "[4/9] Evaluating all models..."
 python.exe -m src.evaluation.evaluate_models
 
 echo ""
-echo "[5/8] Running uncertainty analysis..."
+echo "[5/9] Running uncertainty analysis..."
 python.exe -m src.analysis.uncertainty
 
 echo ""
-echo "[6/8] Building uncertainty-aware decision rules..."
+echo "[6/9] Building uncertainty-aware decision rules..."
 python.exe -m src.analysis.decision_rules
 
 echo ""
-echo "[7/8] Training GP-LVM..."
+echo "[7/9] Training GP-LVM..."
 python.exe -m src.training.train_gplvm
 
 echo ""
-echo "[8/8] Running latent analysis..."
+echo "[8/9] Running latent analysis..."
 python.exe -m src.analysis.latent_analysis
 
+echo ""
+echo "[9/9] Running coverage analysis..."
+python.exe -m src.analysis.coverage_analysis
 echo ""
 echo "========================================"
 echo "Full pipeline finished successfully"
