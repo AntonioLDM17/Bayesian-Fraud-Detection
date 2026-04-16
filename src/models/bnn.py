@@ -9,7 +9,6 @@ from pyro.infer import Predictive
 from pyro.nn import PyroModule, PyroSample
 
 from src.config import (
-    BNN_DROPOUT_RATE,
     BNN_HIDDEN_DIM_1,
     BNN_HIDDEN_DIM_2,
     BNN_PRIOR_SCALE,
@@ -17,14 +16,19 @@ from src.config import (
     DEVICE,
 )
 
+
 class BayesianMLP(PyroModule):
     """
     Bayesian MLP for binary classification using Pyro.
 
     Architecture:
-        input -> hidden_1 -> activation -> dropout
-              -> hidden_2 -> activation -> dropout
+        input -> hidden_1 -> activation
+              -> hidden_2 -> activation
               -> output(logit)
+
+    Notes:
+    - Dropout has been removed so that predictive uncertainty is driven
+      only by the Bayesian posterior over weights, making interpretation cleaner.
     """
 
     def __init__(
@@ -33,7 +37,7 @@ class BayesianMLP(PyroModule):
         hidden_dim_1: int = BNN_HIDDEN_DIM_1,
         hidden_dim_2: int = BNN_HIDDEN_DIM_2,
         prior_scale: float = BNN_PRIOR_SCALE,
-        dropout_rate: float = BNN_DROPOUT_RATE,
+        dropout_rate: float = 0.0,  # kept only for backward compatibility
     ):
         super().__init__()
 
@@ -41,7 +45,7 @@ class BayesianMLP(PyroModule):
         self.hidden_dim_1 = hidden_dim_1
         self.hidden_dim_2 = hidden_dim_2
         self.prior_scale = prior_scale
-        self.dropout_rate = dropout_rate
+        self.dropout_rate = 0.0
 
         self.fc1 = PyroModule[nn.Linear](input_dim, hidden_dim_1)
         self.fc1.weight = PyroSample(
@@ -80,7 +84,6 @@ class BayesianMLP(PyroModule):
         )
 
         self.activation = nn.SiLU()
-        self.dropout = nn.Dropout(p=dropout_rate)
 
     def forward(self, x: torch.Tensor, y: torch.Tensor | None = None) -> torch.Tensor:
         """
@@ -91,11 +94,7 @@ class BayesianMLP(PyroModule):
             y: shape [batch_size]
         """
         hidden = self.activation(self.fc1(x))
-        hidden = self.dropout(hidden)
-
         hidden = self.activation(self.fc2(hidden))
-        hidden = self.dropout(hidden)
-
         logits = self.out(hidden).squeeze(-1)
 
         with pyro.plate("data", x.shape[0]):

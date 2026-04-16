@@ -49,7 +49,7 @@ python -m src.analysis.latent_analysis
 
 Write-Host ""
 Write-Host "[9/9] Running coverage analysis..."
-python -m src.analysis.coverage_analysis
+python -m src.analysis.coverage_risk
 
 Write-Host ""
 Write-Host "========================================"

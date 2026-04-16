@@ -130,7 +130,7 @@ def train_bnn(
         hidden_dim_1=hidden_dim_1,
         hidden_dim_2=hidden_dim_2,
         prior_scale=prior_scale,
-        dropout_rate=dropout_rate,
+        dropout_rate=0.0,  # forced off for interpretability
     ).to(DEVICE)
 
     blocked_model = pyro.poutine.block(model, hide=["obs"])
@@ -272,7 +272,7 @@ def train_and_save(
     hidden_dim_1 = BNN_HIDDEN_DIM_1
     hidden_dim_2 = BNN_HIDDEN_DIM_2
     prior_scale = BNN_PRIOR_SCALE
-    dropout_rate = BNN_DROPOUT_RATE
+    dropout_rate = 0.0
     learning_rate = BNN_LEARNING_RATE
     num_epochs = BNN_NUM_EPOCHS
     batch_size = BNN_BATCH_SIZE
@@ -317,13 +317,11 @@ def train_and_save(
         device=DEVICE,
     )
 
-    # Tune threshold on validation only
     optimal_threshold, best_val_f1 = find_best_f1_threshold(
         y_true=y_val_np,
         y_proba=val_proba,
     )
 
-    # Reuse validation-selected threshold on both validation and test reporting
     val_metrics = evaluate_probabilities(
         y_true=y_val_np,
         y_proba=val_proba,
@@ -356,7 +354,7 @@ def train_and_save(
             "hidden_dim_1": hidden_dim_1,
             "hidden_dim_2": hidden_dim_2,
             "prior_scale": prior_scale,
-            "dropout_rate": dropout_rate,
+            "dropout_rate": 0.0,
             "model_state_dict": model.state_dict(),
             "pyro_param_store": pyro.get_param_store().get_state(),
             "training_info": training_info,
@@ -369,6 +367,7 @@ def train_and_save(
                 "eval_mc_samples": eval_mc_samples,
                 "early_stopping_patience": early_stopping_patience,
                 "min_delta": min_delta,
+                "dropout_rate": 0.0,
             },
             "feature_names": feature_names,
             "optimal_threshold": float(optimal_threshold),

@@ -18,7 +18,6 @@ from src.config import (
     BNN_UNCERTAINTY_DIR,
     DATA_PATH,
     DEFAULT_BNN_UNCERTAINTY_MC_SAMPLES,
-    DEFAULT_THRESHOLD,
     DEVICE,
     PLOT_DPI,
 )
@@ -39,6 +38,9 @@ def ensure_dir(path: str | Path) -> Path:
 def _build_bnn_from_checkpoint(checkpoint: dict[str, Any]) -> BayesianMLP:
     """
     Supports both the new and old checkpoint formats.
+
+    Dropout is forced to 0.0 so uncertainty reflects only the posterior
+    over Bayesian weights.
     """
     input_dim = checkpoint["input_dim"]
     prior_scale = checkpoint["prior_scale"]
@@ -49,7 +51,7 @@ def _build_bnn_from_checkpoint(checkpoint: dict[str, Any]) -> BayesianMLP:
             hidden_dim_1=checkpoint["hidden_dim_1"],
             hidden_dim_2=checkpoint["hidden_dim_2"],
             prior_scale=prior_scale,
-            dropout_rate=checkpoint.get("dropout_rate", 0.1),
+            dropout_rate=0.0,
         )
 
     return BayesianMLP(
@@ -404,7 +406,8 @@ def run_uncertainty_analysis(
             exclude_row_id=True,
         )
 
-    # Tune threshold on validation if not provided
+    threshold_was_user_provided = threshold is not None
+
     if threshold is None:
         threshold = infer_threshold_from_validation(
             model=model,
@@ -463,7 +466,11 @@ def run_uncertainty_analysis(
         "checkpoint_path": str(checkpoint_path),
         "preprocessor_path": str(preprocessor_path),
         "row_id_included": True,
-        "threshold_selection": "validation_optimized_f1" if threshold is not None else "fixed_user_threshold",
+        "threshold_selection": (
+            "fixed_user_threshold"
+            if threshold_was_user_provided
+            else "validation_optimized_f1"
+        ),
     }
     summary["coverage_risk"] = coverage_risk_results
     summary["selective_prediction"] = selective_results
