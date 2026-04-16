@@ -45,6 +45,7 @@ from src.config import (
 from src.data.load_data import load_data
 from src.data.preprocess import build_standard_preprocessor, get_feature_columns
 from src.data.split import split_features_target
+from src.evaluation.thresholds import find_best_f1_threshold
 from src.models.bnn import BayesianMLP, predict_proba_mc
 from src.utils.seed import set_seed
 
@@ -83,7 +84,7 @@ def evaluate_probabilities(
     y_proba: np.ndarray,
     threshold: float = DEFAULT_THRESHOLD,
 ) -> dict[str, float]:
-    """Evaluate probability predictions."""
+    """Evaluate probability predictions at a given threshold."""
     y_pred = (y_proba >= threshold).astype(int)
 
     return {
@@ -178,7 +179,7 @@ def train_bnn(
             num_samples=num_mc_samples,
             device=DEVICE,
         )
-        val_metrics = evaluate_probabilities(y_val, val_proba)
+        val_metrics = evaluate_probabilities(y_val, val_proba, threshold=DEFAULT_THRESHOLD)
 
         history["val_pr_auc"].append(val_metrics["pr_auc"])
         history["val_roc_auc"].append(val_metrics["roc_auc"])
@@ -235,6 +236,10 @@ def train_and_save(
 ) -> dict[str, Any]:
     """
     Train BNN, evaluate it, and save the best checkpoint + preprocessing.
+
+    Final reporting logic:
+    - tune threshold on validation
+    - reuse the same threshold on test
     """
     set_seed(RANDOM_STATE)
     output_dir = ensure_dir(output_dir)
@@ -249,7 +254,11 @@ def train_and_save(
     y_val = splits.y_val
     y_test = splits.y_test
 
-    feature_names = get_feature_columns(X_train_df.columns, exclude_target=False, exclude_row_id=True)
+    feature_names = get_feature_columns(
+        X_train_df.columns,
+        exclude_target=False,
+        exclude_row_id=True,
+    )
     preprocessor = build_standard_preprocessor(feature_names)
 
     X_train = preprocessor.fit_transform(X_train_df[feature_names]).astype(np.float32)
@@ -308,8 +317,26 @@ def train_and_save(
         device=DEVICE,
     )
 
-    val_metrics = evaluate_probabilities(y_val_np, val_proba)
-    test_metrics = evaluate_probabilities(y_test_np, test_proba)
+    # Tune threshold on validation only
+    optimal_threshold, best_val_f1 = find_best_f1_threshold(
+        y_true=y_val_np,
+        y_proba=val_proba,
+    )
+
+    # Reuse validation-selected threshold on both validation and test reporting
+    val_metrics = evaluate_probabilities(
+        y_true=y_val_np,
+        y_proba=val_proba,
+        threshold=optimal_threshold,
+    )
+    test_metrics = evaluate_probabilities(
+        y_true=y_test_np,
+        y_proba=test_proba,
+        threshold=optimal_threshold,
+    )
+
+    print(f"Validation-selected optimal threshold: {optimal_threshold:.4f}")
+    print(f"Best validation F1 at optimal threshold: {best_val_f1:.4f}")
 
     print("Validation metrics for bayesian_neural_network:")
     for metric_name, metric_value in val_metrics.items():
@@ -344,6 +371,8 @@ def train_and_save(
                 "min_delta": min_delta,
             },
             "feature_names": feature_names,
+            "optimal_threshold": float(optimal_threshold),
+            "best_val_f1_at_optimal_threshold": float(best_val_f1),
         },
         checkpoint_path,
     )
@@ -356,6 +385,8 @@ def train_and_save(
             "checkpoint_path": str(checkpoint_path),
             "preprocessor_path": str(preprocessor_path),
             "training_info": training_info,
+            "optimal_threshold": float(optimal_threshold),
+            "best_val_f1_at_optimal_threshold": float(best_val_f1),
         }
     }
 

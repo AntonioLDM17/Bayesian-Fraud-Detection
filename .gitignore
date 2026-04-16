@@ -1,6 +1,8 @@
 data/raw/*
 !data/raw/README.md
 
+proyecto_Prob_AI.pdf
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -114,21 +114,20 @@ XGB_COLSAMPLE_BYTREE: float = 0.8
 # Bayesian Neural Network configuration
 # ============================================================
 
-BNN_HIDDEN_DIM_1: int = 128
-BNN_HIDDEN_DIM_2: int = 64
-BNN_PRIOR_SCALE: float = 0.5
+BNN_HIDDEN_DIM_1: int = 256
+BNN_HIDDEN_DIM_2: int = 128
+BNN_PRIOR_SCALE: float = 0.9
 BNN_DROPOUT_RATE: float = 0.1
 
-BNN_LEARNING_RATE: float = 5e-4
-BNN_NUM_EPOCHS: int = 80
+BNN_LEARNING_RATE: float = 2e-4
+BNN_NUM_EPOCHS: int = 150
 BNN_BATCH_SIZE: int = 512
 
 BNN_TRAIN_MC_SAMPLES: int = 100
 BNN_EVAL_MC_SAMPLES: int = 200
 
-BNN_EARLY_STOPPING_PATIENCE: int = 15
-BNN_MIN_DELTA: float = 5e-4
-
+BNN_EARLY_STOPPING_PATIENCE: int = 30
+BNN_MIN_DELTA: float = 1e-4
 
 # ============================================================
 # GP-LVM configuration
