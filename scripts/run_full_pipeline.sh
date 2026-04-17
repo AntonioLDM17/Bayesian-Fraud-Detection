@@ -50,7 +50,7 @@ python.exe -m src.analysis.latent_analysis
 
 echo ""
 echo "[9/9] Running coverage analysis..."
-python.exe -m src.analysis.coverage_analysis
+python.exe -m src.analysis.coverage_risk
 echo ""
 echo "========================================"
 echo "Full pipeline finished successfully"

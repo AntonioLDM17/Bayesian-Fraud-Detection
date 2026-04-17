@@ -49,29 +49,29 @@
   },
   "confusion_counts": {
     "TN": 294,
-    "TP": 82,
-    "FN": 16
+    "TP": 81,
+    "FN": 17
   },
   "decision_counts": {
-    "REVIEW": 161,
-    "ACCEPT": 156,
+    "REVIEW": 235,
+    "ACCEPT": 82,
     "BLOCK": 75
   },
   "uncertainty_summary": {
-    "mean_uncertainty": 0.10425696555395282,
-    "median_uncertainty": 0.08038517,
+    "mean_uncertainty": 0.1615224639886018,
+    "median_uncertainty": 0.134192625,
     "matched_rows": 392
   },
   "uncertainty_by_class": {
     "0": {
       "count": 294,
-      "mean_uncertainty": 0.1174766847142857,
-      "median_uncertainty": 0.092781095
+      "mean_uncertainty": 0.18830620083759186,
+      "median_uncertainty": 0.166909695
     },
     "1": {
       "count": 98,
-      "mean_uncertainty": 0.06459780807295418,
-      "median_uncertainty": 0.023711182
+      "mean_uncertainty": 0.08117125344163169,
+      "median_uncertainty": 1.0486089000000001e-05
     }
   },
   "notes": [

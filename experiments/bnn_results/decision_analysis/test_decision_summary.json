@@ -1,28 +1,28 @@
 {
   "decision_counts": {
-    "ACCEPT": 29572,
-    "REVIEW": 27295,
-    "BLOCK": 95
+    "REVIEW": 41451,
+    "ACCEPT": 15424,
+    "BLOCK": 87
   },
   "by_decision": {
     "ACCEPT": {
-      "count": 29572,
-      "fraud_rate": 3.381577167590964e-05,
-      "mean_probability": 0.040153312736629254,
-      "mean_uncertainty": 0.0605385833102597
+      "count": 15424,
+      "fraud_rate": 6.483402489626556e-05,
+      "mean_probability": 0.0060031907884800515,
+      "mean_uncertainty": 0.05422774462806155
     },
     "REVIEW": {
-      "count": 27295,
-      "fraud_rate": 0.0008060084264517311,
-      "mean_probability": 0.19270240217959336,
-      "mean_uncertainty": 0.18197739464506318
+      "count": 41451,
+      "fraud_rate": 0.0006031217582205496,
+      "mean_probability": 0.11179688598626086,
+      "mean_uncertainty": 0.23541456687773515
     },
     "BLOCK": {
-      "count": 95,
-      "fraud_rate": 0.7894736842105263,
-      "mean_probability": 0.9969260355789475,
-      "mean_uncertainty": 0.0244516940010382
+      "count": 87,
+      "fraud_rate": 0.8275862068965517,
+      "mean_probability": 0.9985855872413794,
+      "mean_uncertainty": 0.017564198024347576
     }
   },
-  "optimal_threshold": 0.9079023003578186
+  "optimal_threshold": 0.8999524712562561
 }

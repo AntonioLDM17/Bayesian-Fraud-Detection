@@ -2,30 +2,30 @@
   "coverage_risk_points": 50,
   "selective_prediction_points": 20,
   "best_low_risk_point": {
-    "uncertainty_threshold": 0.0,
-    "coverage": 5.266669007408448e-05,
-    "risk": 0.0
+    "uncertainty_threshold": 0.2331993657142857,
+    "coverage": 0.6928654190512974,
+    "risk": 0.0005067524767527301
   },
   "max_coverage_point": {
-    "uncertainty_threshold": 0.48789954,
+    "uncertainty_threshold": 0.49681604,
     "coverage": 1.0,
-    "risk": 0.0008953337312594361
+    "risk": 0.0007197780976791545
   },
   "nearest_target_coverages": {
     "0.5": {
-      "uncertainty_threshold": 0.09957133469387756,
-      "coverage": 0.5183455637091394,
-      "risk": 0.0007112375533428165
+      "uncertainty_threshold": 0.16222564571428572,
+      "coverage": 0.5076893367508163,
+      "risk": 0.0006915868460181888
     },
     "0.7": {
-      "uncertainty_threshold": 0.13939986857142858,
-      "coverage": 0.688915417295741,
-      "risk": 0.00056062382141583
+      "uncertainty_threshold": 0.2331993657142857,
+      "coverage": 0.6928654190512974,
+      "risk": 0.0005067524767527301
     },
     "0.9": {
-      "uncertainty_threshold": 0.2290140697959184,
-      "coverage": 0.8939995084442259,
-      "risk": 0.0007658471447647474
+      "uncertainty_threshold": 0.3852859085714286,
+      "coverage": 0.9034092904041291,
+      "risk": 0.0006607073455110765
     }
   }
 }
