@@ -1,0 +1,30 @@
+{
+  "num_models": 4,
+  "best_pr_auc_test": {
+    "model": "boosting_results/xgboost",
+    "value": 0.8697118764531045
+  },
+  "best_f1_test": {
+    "model": "baseline_results/random_forest",
+    "value": 0.8681318681318682
+  },
+  "best_ece_test": {
+    "model": "baseline_results/random_forest",
+    "value": 0.00029259272263380267
+  },
+  "best_nll_test": {
+    "model": "boosting_results/xgboost",
+    "value": 0.0030592424461645647
+  },
+  "fastest_inference": {
+    "model": "baseline_results/logistic_regression",
+    "latency_ms_per_sample": 0.0007386485728043
+  },
+  "metadata": {
+    "evaluation_path": "experiments\\full_evaluation.json",
+    "efficiency_table_path": "experiments\\efficiency_results\\efficiency_table.csv",
+    "output_csv_path": "experiments\\model_comparison_table.csv",
+    "output_md_path": "experiments\\model_comparison_table.md",
+    "efficiency_merged": true
+  }
+}

@@ -1,0 +1,5 @@
+model,artifact_type,model_path,artifact_size_mb,training_time_seconds,device,load_time_seconds,inference_time_total_seconds,latency_ms_per_sample,num_samples,mc_samples_used,preprocessor_path,preprocessor_size_mb,artifact_size_mb_total
+baseline_results/logistic_regression,sklearn,experiments\baseline_results\logistic_regression.joblib,0.0042209625244140625,,cpu,0.0011537666626585026,0.04207490000408143,0.0007386485728043508,56962,,,,
+boosting_results/xgboost,sklearn,experiments\boosting_results\xgboost.joblib,0.5864076614379883,,cpu,0.0644521333257823,0.09158453332687107,0.0016078180774353266,56962,,,,
+baseline_results/random_forest,sklearn,experiments\baseline_results\random_forest.joblib,7.5076093673706055,,cpu,0.159847466663147,0.2894995333335828,0.005082327399557298,56962,,,,
+bnn_results/bayesian_neural_network,bnn,experiments\bnn_results\bayesian_neural_network.pt,0.31955432891845703,,cpu,0.011353366678425422,24.72877490000489,0.4341275745234523,56962,200.0,experiments\bnn_results\preprocessor.joblib,0.0033416748046875,0.32289600372314453
