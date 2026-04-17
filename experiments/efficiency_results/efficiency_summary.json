@@ -2,11 +2,11 @@
   "num_models": 4,
   "fastest_load": {
     "model": "baseline_results/logistic_regression",
-    "load_time_seconds": 0.0011537666626585026
+    "load_time_seconds": 0.0011157333210576326
   },
   "fastest_inference": {
     "model": "baseline_results/logistic_regression",
-    "latency_ms_per_sample": 0.0007386485728043508
+    "latency_ms_per_sample": 0.0007234144400895464
   },
   "smallest_artifact": {
     "model": "baseline_results/logistic_regression",
@@ -15,14 +15,14 @@
   "mean_by_artifact_type": [
     {
       "artifact_type": "bnn",
-      "load_time_seconds": 0.011353366678425422,
-      "latency_ms_per_sample": 0.4341275745234523,
+      "load_time_seconds": 0.02023186666580538,
+      "latency_ms_per_sample": 0.3105472349987216,
       "artifact_size_mb": 0.31955432891845703
     },
     {
       "artifact_type": "sklearn",
-      "load_time_seconds": 0.07515112221719593,
-      "latency_ms_per_sample": 0.0024762646832656586,
+      "load_time_seconds": 0.10527078888521324,
+      "latency_ms_per_sample": 0.0017217263751600174,
       "artifact_size_mb": 2.6994126637776694
     }
   ],

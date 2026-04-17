@@ -1,0 +1,48 @@
+{
+  "models": {
+    "baseline_results/logistic_regression": {
+      "validation": {
+        "ece": 0.06435132015189099,
+        "mce": 0.8381799778889758
+      },
+      "test": {
+        "ece": 0.06444378721250613,
+        "mce": 0.8507219706326811
+      }
+    },
+    "baseline_results/random_forest": {
+      "validation": {
+        "ece": 0.0003011364301347098,
+        "mce": 0.4471428571428572
+      },
+      "test": {
+        "ece": 0.00029259272263380267,
+        "mce": 0.5129166666666667
+      }
+    },
+    "boosting_results/xgboost": {
+      "validation": {
+        "ece": 0.0003376640688339644,
+        "mce": 0.8382136821746826
+      },
+      "test": {
+        "ece": 0.0005796727736954583,
+        "mce": 0.7648184299468994
+      }
+    },
+    "bnn_results/bayesian_neural_network": {
+      "validation": {
+        "ece": 0.08412555381244984,
+        "mce": 0.8051924225846692
+      },
+      "test": {
+        "ece": 0.08324513436542923,
+        "mce": 0.8288529209601574
+      }
+    }
+  },
+  "metadata": {
+    "evaluation_path": "experiments\\full_evaluation.json",
+    "output_dir": "experiments\\calibration_results"
+  }
+}
