@@ -27,6 +27,13 @@ from src.inference.decision_inference import (
 )
 
 
+UNCERTAINTY_THRESHOLD_SUMMARY_PATH = Path(
+    "experiments/bnn_results/uncertainty_analysis/uncertainty_threshold_curve_summary.json"
+)
+UNCERTAINTY_THRESHOLD_SELECTION_FIG_PATH = Path(
+    "experiments/bnn_results/uncertainty_analysis/uncertainty_threshold_selection.png"
+)
+
 st.set_page_config(
     page_title="Bayesian Fraud Detection",
     page_icon="🧠",
@@ -83,6 +90,15 @@ def load_full_evaluation() -> dict:
         return json.load(f)
 
 
+@st.cache_data(show_spinner=False)
+def load_uncertainty_threshold_summary() -> dict:
+    path = Path(UNCERTAINTY_THRESHOLD_SUMMARY_PATH)
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
 def build_model_comparison_table(eval_data: dict) -> pd.DataFrame:
     if not eval_data or "models" not in eval_data:
         return pd.DataFrame()
@@ -128,6 +144,7 @@ def get_feature_names() -> list[str]:
 def render_sidebar_info() -> None:
     resources = load_app_resources()
     decision_context = resources["decision_context"]
+    tau_summary = load_uncertainty_threshold_summary()
 
     st.sidebar.header("Model info")
     st.sidebar.write(f"Checkpoint: `{Path(BNN_CHECKPOINT_PATH).name}`")
@@ -147,10 +164,27 @@ def render_sidebar_info() -> None:
         }
     )
 
+    suggested = tau_summary.get("suggested_threshold")
+    if suggested is not None:
+        st.sidebar.header("τu selection summary")
+        st.sidebar.write(
+            {
+                "suggested_tau_u": round(
+                    float(suggested["uncertainty_threshold"]), 6
+                ),
+                "accept_rate": round(100 * float(suggested["accept_rate"]), 2),
+                "review_rate": round(100 * float(suggested["review_rate"]), 2),
+                "fraud_in_accept_rate": round(
+                    100 * float(suggested["fraud_in_accept_rate"]), 4
+                ),
+            }
+        )
+
     st.sidebar.markdown("---")
     st.sidebar.caption(
-        "Note: input features V1–V28 are anonymized PCA components from the dataset, "
-        "so this interface is designed for case inspection, batch scoring, and monitoring."
+        "Input features V1–V28 are anonymized PCA components. "
+        "This interface is mainly intended for batch scoring, case inspection, "
+        "and system-level monitoring."
     )
 
 
@@ -220,9 +254,10 @@ def explain_decision(row: pd.Series, decision_context: dict) -> str:
 
     if decision == "BLOCK":
         return (
-            f"Blocked because fraud probability ({prob:.4f}) is above the optimal threshold "
-            f"({decision_context['optimal_threshold']:.4f}) and uncertainty ({unc:.4f}) "
-            f"is below the uncertainty threshold ({decision_context['uncertainty_threshold']:.4f})."
+            f"Blocked because fraud probability ({prob:.4f}) is above the block threshold "
+            f"({decision_context['block_probability_threshold']:.4f}) and uncertainty "
+            f"({unc:.4f}) is below the uncertainty threshold "
+            f"({decision_context['uncertainty_threshold']:.4f})."
         )
 
     if decision == "REVIEW":
@@ -232,13 +267,14 @@ def explain_decision(row: pd.Series, decision_context: dict) -> str:
                 f"threshold ({decision_context['uncertainty_threshold']:.4f})."
             )
         return (
-            "Sent to review because the case is suspicious but does not meet the "
-            "strict blocking rule with sufficient confidence."
+            f"Sent to review because fraud probability ({prob:.4f}) is above the operating "
+            f"threshold ({decision_context['optimal_threshold']:.4f}) but the case does not "
+            "meet the strict automatic blocking rule."
         )
 
     return (
-        f"Accepted because fraud probability ({prob:.4f}) is below the optimal threshold "
-        f"({decision_context['optimal_threshold']:.4f})."
+        f"Accepted because fraud probability ({prob:.4f}) is below the operating threshold "
+        f"({decision_context['optimal_threshold']:.4f}) and uncertainty is acceptable."
     )
 
 
@@ -256,15 +292,15 @@ def compute_system_status(dashboard_df: pd.DataFrame) -> tuple[str, str]:
             "Model is making too many errors or is highly uncertain.",
         )
 
-    if mean_unc > 0.15 or review_rate > 0.3:
+    if mean_unc > 0.15 or review_rate > 0.45:
         return (
             "🟡 Caution",
-            "Model uncertainty is significant. Monitor predictions carefully.",
+            "Model uncertainty or manual review load is significant.",
         )
 
     return (
         "🟢 Healthy",
-        "Model is performing reliably with low uncertainty.",
+        "Model is operating with moderate uncertainty and manageable review load.",
     )
 
 
@@ -276,9 +312,11 @@ def compute_system_alerts(dashboard_df: pd.DataFrame) -> list[tuple[str, str]]:
 
     review_rate = 0.0
     block_rate = 0.0
+    accept_rate = 0.0
     if "decision" in dashboard_df.columns:
         review_rate = dashboard_df["decision"].eq("REVIEW").mean()
         block_rate = dashboard_df["decision"].eq("BLOCK").mean()
+        accept_rate = dashboard_df["decision"].eq("ACCEPT").mean()
 
     high_unc_rate = (dashboard_df["uncertainty_std"] > 0.25).mean()
 
@@ -300,8 +338,13 @@ def compute_system_alerts(dashboard_df: pd.DataFrame) -> list[tuple[str, str]]:
     if mean_unc > 0.20:
         alerts.append(("warning", f"Average uncertainty is high: {mean_unc:.4f}"))
 
-    if review_rate > 0.40:
+    if review_rate > 0.50:
         alerts.append(("warning", f"Review rate is high: {review_rate:.2%}"))
+
+    if accept_rate < 0.40:
+        alerts.append(
+            ("warning", f"Automatic acceptance is low: {accept_rate:.2%}")
+        )
 
     if high_unc_rate > 0.20:
         alerts.append(
@@ -349,23 +392,29 @@ def render_batch_interpretation(results: pd.DataFrame) -> None:
 
     review_rate = results["decision"].eq("REVIEW").mean()
     block_rate = results["decision"].eq("BLOCK").mean()
+    accept_rate = results["decision"].eq("ACCEPT").mean()
     mean_unc = results["uncertainty_std"].mean()
 
     messages: list[str] = []
 
-    if review_rate > 0.4:
-        messages.append("High uncertainty: many transactions require manual review.")
+    if accept_rate >= 0.50:
+        messages.append(
+            "This operating point automates a substantial fraction of transactions."
+        )
+
+    if review_rate > 0.45:
+        messages.append("Manual review load is still significant for this batch.")
 
     if block_rate > 0.05:
-        messages.append("Non-trivial fraud detected: automatic blocking is active.")
+        messages.append("Automatic blocking is active for a non-trivial set of cases.")
 
     if mean_unc > 0.2:
-        messages.append("Batch is harder than usual (high average uncertainty).")
+        messages.append("This batch appears harder than average (high uncertainty).")
 
     if messages:
         st.markdown("### Key insights")
         for msg in messages:
-            st.warning(msg)
+            st.info(msg)
 
 
 def render_case_interpretation(case: pd.Series) -> None:
@@ -374,11 +423,16 @@ def render_case_interpretation(case: pd.Series) -> None:
     risk = case.get("risk_level")
     confidence = case.get("confidence_level")
     confusion = case.get("confusion_type")
+    decision = case.get("decision")
 
-    if risk == "High" and confidence == "High":
-        messages.append("High-risk transaction with high confidence.")
-    elif confidence == "Low":
-        messages.append("Model is uncertain: decision should be treated carefully.")
+    if decision == "BLOCK":
+        messages.append("This case falls in the high-risk, low-uncertainty region.")
+
+    elif decision == "REVIEW":
+        messages.append("This case lies in the ambiguous region where automation is unsafe.")
+
+    elif decision == "ACCEPT" and confidence == "High":
+        messages.append("Low-risk case with stable posterior prediction.")
 
     if confusion == "FN":
         messages.append("False negative: fraud not detected (critical error).")
@@ -400,10 +454,12 @@ def render_model_comparison_insights(comparison_df: pd.DataFrame) -> None:
 
     st.markdown("### Key conclusions")
     st.info(
-        f"Best model (ranking): {best_pr['model']} (PR-AUC {best_pr['pr_auc_test']:.4f})"
+        f"Best model for ranking: {best_pr['model']} "
+        f"(PR-AUC {best_pr['pr_auc_test']:.4f})"
     )
     st.info(
-        f"Best calibrated model: {best_cal['model']} (ECE {best_cal['ece_test']:.4f})"
+        f"Best calibrated model: {best_cal['model']} "
+        f"(ECE {best_cal['ece_test']:.4f})"
     )
 
 
@@ -416,16 +472,60 @@ def render_dashboard_interpretation(
     error_rate = (dashboard_df["y_pred"] != dashboard_df["y_true"]).mean()
     mean_unc = dashboard_df["uncertainty_std"].mean()
 
+    accept_rate = 0.0
+    review_rate = 0.0
+    if "decision" in dashboard_df.columns:
+        accept_rate = dashboard_df["decision"].eq("ACCEPT").mean()
+        review_rate = dashboard_df["decision"].eq("REVIEW").mean()
+
     if error_rate < 0.001:
-        messages.append("Very low error rate on test data.")
+        messages.append("Observed error rate on the saved test outputs is very low.")
+
+    if accept_rate > 0.50:
+        messages.append("The current τu enables substantial automation.")
+
+    if review_rate > 0.35:
+        messages.append("A sizable ambiguous region still requires human review.")
 
     if mean_unc > 0.18:
-        messages.append("Uncertainty is significant → REVIEW step is justified.")
+        messages.append("Uncertainty remains important for controlling automation risk.")
 
     if messages:
         st.markdown("### Key system insights")
         for msg in messages:
             st.info(msg)
+
+
+def render_threshold_selection_panel() -> None:
+    st.markdown("### Uncertainty threshold selection")
+
+    summary = load_uncertainty_threshold_summary()
+    if not summary:
+        st.info(
+            "No uncertainty-threshold summary found. "
+            "Run `python -m src.analysis.uncertainty_threshold_curve` first."
+        )
+        return
+
+    c1, c2 = st.columns(2)
+
+    current = summary.get("current_threshold_operating_point", {})
+    suggested = summary.get("suggested_threshold", {})
+
+    with c1:
+        st.markdown("**Current operating point in config**")
+        st.json(current)
+
+    with c2:
+        st.markdown("**Suggested operating point**")
+        st.json(suggested)
+
+    if UNCERTAINTY_THRESHOLD_SELECTION_FIG_PATH.exists():
+        st.image(
+            str(UNCERTAINTY_THRESHOLD_SELECTION_FIG_PATH),
+            caption="Selection of the uncertainty threshold τu",
+            use_container_width=True,
+        )
 
 
 def render_batch_scoring(feature_names: list[str]) -> None:
@@ -477,9 +577,18 @@ def render_batch_scoring(feature_names: list[str]) -> None:
 
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Rows", f"{len(results)}")
-            c2.metric("Mean fraud probability", f"{results['predicted_probability'].mean():.4f}")
-            c3.metric("Mean uncertainty", f"{results['uncertainty_std'].mean():.4f}")
-            c4.metric("Review rate", f"{(results['decision'].eq('REVIEW').mean() * 100):.2f}%")
+            c2.metric(
+                "Mean fraud probability",
+                f"{results['predicted_probability'].mean():.4f}",
+            )
+            c3.metric(
+                "Mean uncertainty",
+                f"{results['uncertainty_std'].mean():.4f}",
+            )
+            c4.metric(
+                "Accept rate",
+                f"{(results['decision'].eq('ACCEPT').mean() * 100):.2f}%",
+            )
 
             render_batch_interpretation(results)
 
@@ -553,7 +662,11 @@ def render_case_explorer() -> None:
                 how="left",
             )
 
-    df = add_context_columns(df, decision_context=decision_context, reference_df=uncertainty_df)
+    df = add_context_columns(
+        df,
+        decision_context=decision_context,
+        reference_df=uncertainty_df,
+    )
     if "decision" in df.columns:
         df["decision_explanation"] = df.apply(
             lambda row: explain_decision(row, decision_context),
@@ -567,7 +680,9 @@ def render_case_explorer() -> None:
     )
     selected_decision = c2.selectbox(
         "Filter by decision",
-        options=["All"] + sorted(df["decision"].dropna().unique().tolist()) if "decision" in df.columns else ["All"],
+        options=["All"] + sorted(df["decision"].dropna().unique().tolist())
+        if "decision" in df.columns
+        else ["All"],
     )
     sort_by = c3.selectbox(
         "Sort by",
@@ -709,11 +824,36 @@ def render_system_dashboard() -> None:
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Transactions", f"{len(dashboard_df)}")
-    c2.metric("Mean fraud probability", f"{dashboard_df['predicted_probability'].mean():.4f}")
-    c3.metric("Mean uncertainty", f"{dashboard_df['uncertainty_std'].mean():.4f}")
-    c4.metric("Observed error rate", f"{(dashboard_df['y_pred'] != dashboard_df['y_true']).mean():.4%}")
+    c2.metric(
+        "Mean fraud probability",
+        f"{dashboard_df['predicted_probability'].mean():.4f}",
+    )
+    c3.metric(
+        "Mean uncertainty",
+        f"{dashboard_df['uncertainty_std'].mean():.4f}",
+    )
+    c4.metric(
+        "Observed error rate",
+        f"{(dashboard_df['y_pred'] != dashboard_df['y_true']).mean():.4%}",
+    )
+
+    if "decision" in dashboard_df.columns:
+        d1, d2, d3 = st.columns(3)
+        d1.metric(
+            "Accept rate",
+            f"{(dashboard_df['decision'].eq('ACCEPT').mean() * 100):.2f}%",
+        )
+        d2.metric(
+            "Review rate",
+            f"{(dashboard_df['decision'].eq('REVIEW').mean() * 100):.2f}%",
+        )
+        d3.metric(
+            "Block rate",
+            f"{(dashboard_df['decision'].eq('BLOCK').mean() * 100):.2f}%",
+        )
 
     render_dashboard_interpretation(dashboard_df, uncertainty_summary)
+    render_threshold_selection_panel()
     render_model_comparison(full_evaluation)
 
     st.markdown("### Decision distribution")
@@ -807,7 +947,7 @@ def main() -> None:
 
         - **Batch scoring** for real transaction files
         - **Case explorer** for inspecting saved model outputs on test cases
-        - **System dashboard** for monitoring probability, uncertainty, decisions, and model comparison
+        - **System dashboard** for monitoring probability, uncertainty, decisions, model comparison, and the selected uncertainty threshold
         """
     )
 
