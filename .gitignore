@@ -3,6 +3,17 @@ data/raw/*
 
 proyecto_Prob_AI.pdf
 
+# LaTex aux
+*.aux
+*.lof
+*.log
+*.lot
+*.fdb_latexmk
+*.fls
+*.out
+*.toc
+*.synctex.gz
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
