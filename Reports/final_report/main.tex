@@ -43,7 +43,6 @@
 \setlength{\abovecaptionskip}{5pt}
 \setlength{\belowcaptionskip}{0pt}
 
-
 \title{Detección de fraude mediante Redes Neuronales Bayesianas: decisiones bajo incertidumbre}
 
 \author{
@@ -58,7 +57,7 @@ Proyecto Final --- Inteligencia Artificial Probabilística
 \begin{abstract}
     Este trabajo desarrolla un enfoque que combina modelos deterministas con una red neuronal bayesiana para transformar probabilidades predictivas en una política de triaje operativo (\textsc{Accept}, \textsc{Review}, \textsc{Block}), todo ello en el contexto de detección de fraude con tarjetas de crédito.
 
-    El sistema estima tanto la probabilidad de fraude como la incertidumbre predictiva, y utiliza esta última para implementar predicción selectiva y control de cobertura-riesgo. Los resultados muestran que, aunque los modelos basados en árboles dominan en rendimiento predictivo y calibración, la red bayesiana permite identificar regiones de alta incertidumbre donde la automatización es menos fiable.
+    El sistema estima tanto la probabilidad de fraude como la incertidumbre predictiva, y utiliza esta última para implementar predicción selectiva y control de cobertura-riesgo. Los resultados muestran que, aunque los modelos basados en árboles dominan en rendimiento predictivo y calibración, la red bayesiana permite identificar regiones de alta incertidumbre donde la automatización es menos fiable y, con un umbral de incertidumbre ajustado \emph{post hoc}, aceptar automáticamente una fracción sustancial de transacciones manteniendo un fraude residual extremadamente bajo en el bucket \textsc{Accept}.
 
     Estos resultados sugieren que el valor del modelado probabilístico en este contexto no está en mejorar métricas de clasificación, sino en habilitar decisiones más seguras mediante abstención selectiva y asignación adaptativa de recursos.
 \end{abstract}
@@ -71,8 +70,6 @@ Sin embargo, la mayoría de enfoques en fraude tabular se centran en optimizar m
 
 En este trabajo proponemos un enfoque basado en incertidumbre que combina baselines deterministas con una red neuronal bayesiana (BNN). El sistema estima probabilidad de fraude e incertidumbre y las integra en una política de triaje con tres acciones: \textsc{Accept}, \textsc{Review} y \textsc{Block}. Este diseño permite implementar predicción selectiva y analizar explícitamente el compromiso cobertura-riesgo.
 
-% La pregunta central es si un modelo bayesiano puede aportar valor práctico en detección de fraude aunque no sea el mejor en métricas clásicas de clasificación. Nuestra hipótesis es que su utilidad reside en identificar regiones de alta incertidumbre donde la automatización es menos fiable.
-
 En última instancia, este proyecto no sólo busca comparar modelos de detección de fraude, sino explorar cómo no existe una regla universal mediante la cual juzgar nuestros modelos (p.ej., PR-AUC ó NLL), sino que la utilidad de cada modelo depende de cómo se traduzca su salida en decisiones operativas. En este sentido, el valor de un modelo bayesiano no procederá, necesariamente, de superar a los modelos tabulares en clasificación pura, sino de hacer visible qué parte del espacio de decisión debería tratarse con mayor cautela.
 
 \newpage
@@ -82,6 +79,7 @@ En última instancia, este proyecto no sólo busca comparar modelos de detecció
     \item Proponemos un enfoque de detección de fraude basado en incertidumbre que integra predicción y decisión operativa.
     \item Comparamos una BNN con baselines deterministas, evaluando tanto rendimiento predictivo como utilidad decisional.
     \item Introducimos una política de triaje (\textsc{Accept/Review/Block}) basada en probabilidad e incertidumbre, junto con análisis de predicción selectiva.
+    \item Mostramos que el umbral de incertidumbre no es un hiperparámetro fijo arbitrario, sino una palanca operativa que puede ajustarse para equilibrar automatización y riesgo residual.
     \item Complementamos el estudio con una representación latente mediante GPLVM y una interfaz interactiva.
 \end{itemize}
 
@@ -105,7 +103,7 @@ La BNN es un MLP bayesiano con dos capas ocultas:
 \[
     f_w(x)=W_3\,\phi\!\left(W_2\,\phi\!\left(W_1x+b_1\right)+b_2\right)+b_3,
 \]
-donde $\phi(\cdot)$ es la activación SiLU \footnote{La función SiLU (Sigmoid Linear Unit) es definida como $\phi(x) = x \cdot \sigma(x)$, donde $\sigma(x)$ es la función sigmoide. Es ventajosa, respecto a otras alternativas como ReLU, gracias a que \textit{produce} gradientes más suaves y evita \textit{neuronas muertas}}. El vector completo de parámetros se denota por\\
+donde $\phi(\cdot)$ es la activación SiLU \footnote{La función SiLU (Sigmoid Linear Unit) es definida como $\phi(x) = x \cdot \sigma(x)$, donde $\sigma(x)$ es la función sigmoide. Es ventajosa, respecto a otras alternativas como ReLU, gracias a que \textit{produce} gradientes más suaves y evita \textit{neuronas muertas}}. El vector completo de parámetros se denota por
 $w=\{W_1,b_1,W_2,b_2,W_3,b_3\}$.
 
 Sobre cada bloque de pesos y sesgos se definen priors gaussianos independientes con escala
@@ -147,7 +145,7 @@ El objetivo es maximizar el ELBO
     -
     \mathrm{KL}\!\left(q_{\phi}(w)\,\|\,p(w)\right).
 \]
-Equivalentemente, se minimiza $-\mathcal{L}(\phi)$ (de cara a poder aplicar métodos como \textit{SGD}). Con minibatches $\mathcal{B}$ de tamaño $M$, Pyro optimiza una estimación estocástica
+Equivalentemente, se minimiza $-\mathcal{L}(\phi)$. Con minibatches $\mathcal{B}$ de tamaño $M$, Pyro optimiza una estimación estocástica
 \[
     \widehat{\mathcal{L}}(\phi)=
     \frac{N}{M}\sum_{i\in\mathcal{B}}
@@ -166,7 +164,7 @@ Para un nuevo ejemplo $x^\star$, la probabilidad predictiva bayesiana ideal es
     \int \sigma(f_w(x^\star))\,p(w\mid\mathcal{D})\,dw.
 \]
 
-donde podemos interpretar $\sigma(f_w(x^\star))$ como la probabilidad de fraude dada una configuración concreta de pesos $w$. Sin embargo, como ya hemos visto, la posterior $p(w\mid\mathcal{D})$ es intratable, por lo que se aproxima mediante $q_{\phi}(w)$. Por lo tanto, la probabilidad predictiva aproximada se estima mediante muestreo Monte Carlo:
+Sin embargo, como la posterior $p(w\mid\mathcal{D})$ es intratable, se aproxima mediante $q_{\phi}(w)$. Por tanto, la probabilidad predictiva aproximada se estima mediante muestreo Monte Carlo:
 \[
     \hat{p}(x^\star)=
     \frac{1}{S}\sum_{s=1}^{S}\sigma\!\left(f_{w^{(s)}}(x^\star)\right),
@@ -185,13 +183,12 @@ Mediante dichas muestras, se establece una señal de incertidumbre basada en la 
         \right)^2
     }.
 \]
-donde el término de normalización $1/(S-1)$ se incluye para obtener una estimación \textbf{no sesgada }de la varianza muestral.
 
-En nuestro caso, la incertidumbre no se descompone, estrictamente, en una parte aleatoria y otra epistémica. En su lugar, usamos una medida simple de dispersión posterior que refleja la estabilidad de la predicción ante variaciones en los pesos. De esta forma, una alta desviación estándar se puede interpretar como una señal de que distintas muestras del posterior sobre pesos producen predicciones muy diferentes a una misma transacción, lo que sugiere que el modelo no tiene una convicción clara sobre esa muestra en particular. Dicha señal modula la automatización del sistema, de forma que casos con alta incertidumbre se envían a revisión humana en lugar de automatizarse.
+En nuestro caso, la incertidumbre no se descompone estrictamente en una parte aleatoria y otra epistémica. En su lugar, usamos una medida simple de dispersión posterior que refleja la estabilidad de la predicción ante variaciones en los pesos. De esta forma, una alta desviación estándar se puede interpretar como una señal de que distintas muestras del posterior sobre pesos producen predicciones muy diferentes para una misma transacción, lo que sugiere que el modelo no tiene una convicción clara sobre esa muestra en particular. Dicha señal modula la automatización del sistema, de forma que casos con alta incertidumbre se envían a revisión humana en lugar de automatizarse.
 
 \newpage
 
-De cara a derivar transacciones a revisión, la principal pregunta es qué umbral de probabilidad usar para decidir cuándo una transacción es lo suficientemente riesgosa como para no aceptarla automáticamente. Es decir, dado \( \hat{p}(x) \) (la estimación de la probabilidad de fraude), ¿qué valor de \( \tau \,|\, \if \hat{p}(x) \geq \tau \rightarrow \textsc{Review} \) es el más adecuado?
+De cara a derivar transacciones a revisión, la principal pregunta es qué umbral de probabilidad usar para decidir cuándo una transacción es lo suficientemente riesgosa como para no aceptarla automáticamente. Es decir, dado \( \hat{p}(x) \), ¿qué valor de \( \tau \) es el más adecuado?
 
 Si bien podríamos elegir un umbral arbitrario (p.ej., 0.5), esto no reflejaría necesariamente el mejor punto de operación para nuestro modelo ni para nuestro caso de uso. En su lugar, optamos por validar el umbral óptimo en el conjunto de validación, buscando maximizar la métrica F1:
 \[
@@ -206,15 +203,13 @@ Sea $\hat{p}(x)$ la probabilidad de fraude estimada por la BNN y $u(x)$ la incer
 \[
     d(x)=
     \begin{cases}
-        \textsc{Block},  & \hat{p}(x)\ge \tau_{\mathrm{block}} \;\text{AND}\; u(x)\le \tau_u, \\[4pt]
-        \textsc{Review}, & \hat{p}(x)\ge \tau^\star \;\text{OR}\; u(x)>\tau_u,                \\[4pt]
+        \textsc{Block},  & \hat{p}(x)\ge \tau_{\mathrm{block}} \;\text{AND}\; u(x)\le \tau_u, \\
+        \textsc{Review}, & \hat{p}(x)\ge \tau^\star \;\text{OR}\; u(x)>\tau_u,                \\
         \textsc{Accept}, & \text{en otro caso},
     \end{cases}
 \]
 con
-$\tau_{\mathrm{block}}=0.80,\qquad \tau_u=0.10.$
-
-Esta regla busca separar tres regímenes operativos distintos. \textsc{Accept} agrupa casos con riesgo bajo y suficiente estabilidad predictiva, donde la revisión manual añadiría coste sin demasiado valor. \textsc{Review} actúa como zona de amortiguación: recoge tanto transacciones con probabilidad de fraude relevante como aquellas para las que el modelo sigue mostrando una dispersión posterior elevada. \textsc{Block}, por el contrario, está reservado para casos donde el sistema combina una probabilidad muy alta con baja incertidumbre, es decir, donde no solo predice fraude, sino que lo hace de forma suficientemente consistente como para justificar una automatización agresiva.
+$\tau_{\mathrm{block}}=0.80,\qquad \tau_u=0.1857 \approx 0.186.$
 
 Para un umbral de abstención $\lambda$ sobre la incertidumbre, definimos el subconjunto retenido
 $ S_{\lambda}=\{i:\;u_i\le \lambda\}. $
@@ -236,7 +231,18 @@ La precisión selectiva se resume por
 
 Esta formulación se alinea con la literatura de clasificación selectiva \citep{elyaniv2010}. En resumen, el modelo no solo produce una predicción probabilística, sino que convierte dicha predicción en una política explícita de automatización parcial.
 
-\newpage
+\subsection{Selección del umbral de incertidumbre}
+
+A diferencia del umbral de probabilidad, que se valida en el conjunto de validación maximizando F1, el umbral de incertidumbre $\tau_u$ controla un compromiso diferente: cuánto volumen puede automatizar el sistema sin degradar en exceso la seguridad del bucket \textsc{Accept}. En otras palabras, $\tau_u$ no regula discriminación binaria, sino el equilibrio entre cobertura automática y riesgo residual.
+
+Para estudiar este compromiso analizamos, \emph{post hoc}, cómo varían simultáneamente la fracción de transacciones aceptadas automáticamente y la tasa de fraude dentro del bucket \textsc{Accept} al barrer distintos valores de $\tau_u$. La Figura~\ref{fig:tauu_selection} muestra este trade-off. El valor inicial $\tau_u=0.10$ resultó excesivamente conservador, ya que enviaba más del 72\% de las transacciones a \textsc{Review}. Por ello, seleccionamos un operating point más equilibrado buscando minimizar la tasa de fraude residual en \textsc{Accept} sujeto a una cobertura mínima del 50\%. El valor resultante es $\tau_u \approx 0.186$.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.62\linewidth]{figures/uncertainty_threshold_selection.png}
+    \caption{Selección del umbral de incertidumbre $\tau_u$. Al aumentar $\tau_u$, crece la fracción de transacciones aceptadas automáticamente, mientras que la tasa de fraude dentro de \textsc{Accept} se mantiene muy baja en un rango amplio. La línea vertical marca el umbral seleccionado para el sistema final.}
+    \label{fig:tauu_selection}
+\end{figure}
 
 \section{Configuración experimental}
 
@@ -277,7 +283,7 @@ Además de la BNN, comparamos \emph{Logistic Regression}, \emph{Random Forest} y
         Optimización BNN   & learning rate $2\times10^{-4}$, 150 épocas, batch size 512 \\
         Inferencia BNN     & 100 muestras MC en evaluación; 200 en incertidumbre        \\
         Early stopping BNN & paciencia 30 sobre PR-AUC de validación                    \\
-        Decisión           & $\tau_{\mathrm{block}}=0.80$, $\tau_u=0.10$                \\
+        Decisión           & $\tau_{\mathrm{block}}=0.80$, $\tau_u=0.186$               \\
         GPLVM              & dimensión latente 2, 1500 épocas                           \\
         \bottomrule
     \end{tabular}
@@ -360,25 +366,25 @@ Además, los diagramas sugieren matices entre los propios baselines. Random Fore
     \label{fig:reliability}
 \end{figure}
 
-La Tabla~\ref{tab:decision_table} resume la transición desde probabilidad e incertidumbre hacia decisiones accionables. \textsc{Accept} concentra transacciones de riesgo muy bajo; \textsc{Block} recoge una fracción mínima de operaciones, pero con una tasa de fraude extraordinariamente alta; y \textsc{Review} absorbe la región ambigua donde automatizar resultaría más arriesgado.
+La Tabla~\ref{tab:decision_table} resume la transición desde probabilidad e incertidumbre hacia decisiones accionables. A diferencia del operating point inicial con $\tau_u=0.10$, que era extremadamente conservador, el umbral ajustado $\tau_u\approx 0.186$ permite automatizar una fracción sustancial del flujo manteniendo un fraude residual muy bajo en \textsc{Accept}. \textsc{Accept} concentra transacciones de riesgo muy bajo; \textsc{Block} sigue recogiendo una fracción mínima de operaciones, pero con una tasa de fraude extraordinariamente alta; y \textsc{Review} absorbe la región ambigua donde automatizar resultaría más arriesgado.
 
 \begin{table}[!htbp]
     \centering
     \small
-    \caption{Resumen de decisiones del BNN en test.}
+    \caption{Resumen de decisiones del BNN en test con $\tau_u \approx 0.186$.}
     \label{tab:decision_table}
     \begin{tabular}{lrrrrr}
         \toprule
         Decisión        & Conteo & Cobertura (\%) & Fraude (\%) & Prob. media (\%) & Incertidumbre media (\%) \\
         \midrule
-        \textsc{Accept} & 15424  & 27.1           & 0.006       & 0.6              & 5.4                      \\
-        \textsc{Review} & 41451  & 72.8           & 0.060       & 11.2             & 23.5                     \\
-        \textsc{Block}  & 87     & 0.15           & 82.8        & 99.9             & 1.8                      \\
+        \textsc{Accept} & 32698  & 57.4           & 0.003       & 1.68             & 9.90                     \\
+        \textsc{Review} & 24167  & 42.4           & 0.083       & 17.49            & 30.54                    \\
+        \textsc{Block}  & 97     & 0.17           & 79.4        & 99.68            & 2.94                     \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-Este resultado es central para el caso de uso. Más que producir una etiqueta, el sistema redistribuye el espacio de decisiones en tres niveles de intervención. El bucket \textsc{Block} es especialmente informativo: aunque es muy pequeño, concentra una proporción altísima de fraude y lo hace con incertidumbre media baja, lo que encaja con la idea de bloquear únicamente cuando la predicción es extrema y estable. \textsc{Accept}, por el contrario, recoge una parte importante del volumen con riesgo residual muy reducido. La mayor carga operativa recae sobre \textsc{Review}, que actúa como mecanismo de prudencia: absorbe el grueso de las transacciones donde el riesgo o la inestabilidad posterior desaconsejan una decisión totalmente automática.
+Este resultado es central para el caso de uso. Más que producir una etiqueta, el sistema redistribuye el espacio de decisiones en tres niveles de intervención. El bucket \textsc{Block} es especialmente informativo: aunque es muy pequeño, concentra una proporción altísima de fraude y lo hace con incertidumbre media baja, lo que encaja con la idea de bloquear únicamente cuando la predicción es extrema y estable. \textsc{Accept}, por el contrario, recoge ahora más de la mitad del volumen con riesgo residual extremadamente reducido. \textsc{Review} sigue actuando como mecanismo de prudencia, pero deja de absorber casi todo el flujo y pasa a concentrar precisamente los casos donde el riesgo o la inestabilidad posterior desaconsejan una decisión totalmente automática.
 
 La Figura~\ref{fig:gplvm_decision} complementa esta lectura mostrando que dichas decisiones se agrupan en regiones diferenciadas del espacio latente. Aunque no existe una separación perfectamente limpia entre las tres clases de decisión, sí aparecen zonas donde \textsc{Review} domina claramente y otras donde ciertos casos \textsc{Block} quedan más apartados. Esto sugiere que la política operativa no es arbitraria, sino que refleja cierta estructura geométrica del espacio inducido por el GPLVM.
 
@@ -450,16 +456,16 @@ La Tabla~\ref{tab:efficiency} resume el coste computacional de los modelos en in
 En otras palabras, el enriquecimiento probabilístico tiene un coste explícito. El uso de una BNN en este contexto solo se justifica si la mejora en control del riesgo compensa la penalización computacional. El sistema incluye además un \emph{frontend} funcional en Streamlit para \emph{batch scoring}, exploración de casos y \emph{dashboard}, así como un \texttt{Dockerfile} para despliegue reproducible. También se implementa una capa de monitorización \emph{snapshot-style} que resume distribución de decisiones, incertidumbre y señales agregadas de riesgo. No se trata de una monitorización online en producción, sino de una primera aproximación reproducible a evaluación post-despliegue.
 
 \paragraph{Consistencia de artefactos.}
-Todos los umbrales, métricas y reglas de decisión reportados en este trabajo se derivan directamente de los artefactos experimentales validados, sin ajuste \emph{post hoc}.
+Todos los umbrales de probabilidad, métricas de clasificación y reglas base del sistema se derivan directamente de los artefactos experimentales validados. En cambio, el umbral de incertidumbre $\tau_u$ reportado en la política final se fija mediante un análisis \emph{post hoc} del compromiso entre cobertura automática y fraude residual en \textsc{Accept}. Por tanto, los resultados de triaje deben interpretarse como un análisis operativo sobre la salida del modelo ya entrenado, no como un procedimiento de ajuste validado en un conjunto independiente.
 
 \FloatBarrier
 \section{Limitaciones y conclusión}
 
-Este trabajo presenta varias limitaciones importantes. Primero, la BNN no supera a los mejores modelos deterministas en ranking predictivo ni en calibración sobre este dataset tabular. Segundo, la incertidumbre usada por el sistema es una dispersión Monte Carlo de la posterior predictiva aproximada, no una descomposición formal entre incertidumbre aleatoria y epistémica. Tercero, la monitorización es offline y de tipo \emph{snapshot}, no un sistema online de producción. Cuarto, los tiempos de entrenamiento no fueron medidos sistemáticamente y por tanto se reportan como \texttt{UNSPECIFIED} para no introducir estimaciones no verificables.
+Este trabajo presenta varias limitaciones importantes. Primero, la BNN no supera a los mejores modelos deterministas en ranking predictivo ni en calibración sobre este dataset tabular. Segundo, la incertidumbre usada por el sistema es una dispersión Monte Carlo de la posterior predictiva aproximada, no una descomposición formal entre incertidumbre aleatoria y epistémica. Tercero, la monitorización es offline y de tipo \emph{snapshot}, no un sistema online de producción. Cuarto, aunque los tiempos de entrenamiento se han medido para caracterizar el coste computacional del sistema, el umbral de incertidumbre final se selecciona \emph{post hoc} y no mediante un protocolo validado separado.
 
 Aun así, la comparación entre modelos probabilísticos y deterministas en fraude debe formularse en dos planos distintos. En el plano predictivo, XGBoost y Random Forest son superiores a la BNN en las métricas más relevantes de discriminación y, en particular, los modelos de árbol presentan una calibración notablemente mejor. En ese sentido, este trabajo no proporciona evidencia de que una BNN sea el mejor clasificador tabular para este dataset.
 
-Sin embargo, en el plano decisional la conclusión es distinta. La BNN permite construir una política de abstención explícita, identificar una fracción pequeña pero muy concentrada de operaciones de alto riesgo y desplazar a revisión humana los casos donde la automatización sería más frágil. La combinación de la Tabla~\ref{tab:decision_table} y la Figura~\ref{fig:coverage_risk} sugiere precisamente eso: la incertidumbre estimada por el modelo no es solo un subproducto estadístico, sino una variable útil para gestionar el riesgo operativo.
+Sin embargo, en el plano decisional la conclusión es distinta. La BNN permite construir una política de abstención explícita, identificar una fracción pequeña pero muy concentrada de operaciones de alto riesgo y, con el ajuste de $\tau_u$, automatizar aproximadamente el 57\% del flujo manteniendo una tasa de fraude residual en \textsc{Accept} del orden de $3\times10^{-5}$. La combinación de la Tabla~\ref{tab:decision_table}, la Figura~\ref{fig:tauu_selection} y la Figura~\ref{fig:coverage_risk} sugiere precisamente eso: la incertidumbre estimada por el modelo no es solo un subproducto estadístico, sino una variable útil para gestionar el riesgo operativo.
 
 La comparación final, por tanto, no es simplemente entre ``mejor'' y ``peor'' modelo. Si el objetivo fuese únicamente maximizar rendimiento predictivo offline, los modelos de árbol serían la opción natural. Si, en cambio, el objetivo incluye controlar mejor cuándo automatizar, cuándo derivar y cuándo aceptar el coste de una revisión humana, entonces la BNN ofrece una ventaja cualitativamente distinta. Ese es el trade-off central del trabajo: renunciar a parte del rendimiento puro a cambio de una señal explícita de incertidumbre que permite tomar decisiones más prudentes y más adaptadas al coste del error.
 

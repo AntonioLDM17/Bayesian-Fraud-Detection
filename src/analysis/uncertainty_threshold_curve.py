@@ -24,6 +24,7 @@ OUTPUT_CSV_PATH = OUTPUT_DIR / "uncertainty_threshold_curve.csv"
 OUTPUT_JSON_PATH = OUTPUT_DIR / "uncertainty_threshold_curve_summary.json"
 OUTPUT_PLOT_DECISIONS = OUTPUT_DIR / "uncertainty_threshold_vs_decision_rates.png"
 OUTPUT_PLOT_FRAUD = OUTPUT_DIR / "uncertainty_threshold_vs_fraud_rates.png"
+OUTPUT_PLOT_PARETO = OUTPUT_DIR / "accept_vs_fraud_tradeoff.png"
 
 
 def ensure_dir(path: str | Path) -> Path:
@@ -112,13 +113,14 @@ def choose_candidate_thresholds(df: pd.DataFrame, n_grid: int = 50) -> np.ndarra
     if max_unc <= 0:
         return np.array([0.0])
 
-    # grid uniforme + percentiles para tener puntos interpretables
     grid = np.linspace(0.0, max_unc, n_grid)
     percentiles = np.percentile(
         df["uncertainty_std"].to_numpy(dtype=float),
         [1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99],
     )
-    values = np.unique(np.concatenate([grid, percentiles, np.array([UNCERTAINTY_THRESHOLD])]))
+    values = np.unique(
+        np.concatenate([grid, percentiles, np.array([UNCERTAINTY_THRESHOLD])])
+    )
     return np.sort(values)
 
 
@@ -156,6 +158,51 @@ def plot_fraud_rates(results_df: pd.DataFrame, output_path: str | Path) -> None:
     plt.close()
 
 
+def plot_accept_vs_fraud_tradeoff(
+    results_df: pd.DataFrame,
+    output_path: str | Path,
+    selected_tau: float | None = None,
+) -> None:
+    plt.figure(figsize=(8, 5))
+
+    valid_df = results_df[results_df["fraud_in_accept_rate"].notna()].copy()
+
+    plt.plot(
+        valid_df["accept_rate"],
+        valid_df["fraud_in_accept_rate"],
+        marker="o",
+        linewidth=2,
+    )
+
+    plt.xlabel("Accept rate (coverage)")
+    plt.ylabel("Fraud rate inside ACCEPT")
+    plt.title("Automation vs risk trade-off")
+
+    if selected_tau is not None:
+        closest_idx = (
+            valid_df["uncertainty_threshold"] - selected_tau
+        ).abs().idxmin()
+        row = valid_df.loc[closest_idx]
+
+        plt.scatter(
+            [row["accept_rate"]],
+            [row["fraud_in_accept_rate"]],
+            s=80,
+            zorder=5,
+        )
+
+        plt.annotate(
+            rf"$\tau_u \approx {row['uncertainty_threshold']:.3f}$",
+            (row["accept_rate"], row["fraud_in_accept_rate"]),
+            xytext=(10, 10),
+            textcoords="offset points",
+        )
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=PLOT_DPI)
+    plt.close()
+
+
 def run() -> dict[str, Any]:
     ensure_dir(OUTPUT_DIR)
 
@@ -182,12 +229,10 @@ def run() -> dict[str, Any]:
     plot_decision_rates(results_df, OUTPUT_PLOT_DECISIONS)
     plot_fraud_rates(results_df, OUTPUT_PLOT_FRAUD)
 
-    # algunos puntos útiles para el informe
     current_row = results_df.iloc[
         (results_df["uncertainty_threshold"] - UNCERTAINTY_THRESHOLD).abs().argmin()
     ]
 
-    # threshold "útil" de ejemplo: mínimo fraud_in_accept_rate con accept_rate >= 0.5
     candidate_df = results_df[
         (results_df["accept_rate"] >= 0.50)
         & results_df["fraud_in_accept_rate"].notna()
@@ -215,6 +260,14 @@ def run() -> dict[str, Any]:
             ),
             "selection_rule": "minimum fraud_in_accept_rate subject to accept_rate >= 0.50",
         }
+
+    plot_accept_vs_fraud_tradeoff(
+        results_df=results_df,
+        output_path=OUTPUT_PLOT_PARETO,
+        selected_tau=(
+            None if suggested is None else float(suggested["uncertainty_threshold"])
+        ),
+    )
 
     summary = {
         "metadata": {
@@ -252,6 +305,7 @@ def run() -> dict[str, Any]:
     print(f"Saved summary JSON to: {OUTPUT_JSON_PATH}")
     print(f"Saved decision plot to: {OUTPUT_PLOT_DECISIONS}")
     print(f"Saved fraud plot to: {OUTPUT_PLOT_FRAUD}")
+    print(f"Saved accept-vs-fraud plot to: {OUTPUT_PLOT_PARETO}")
 
     print("\nCurrent operating point:")
     print(current_row.to_string())

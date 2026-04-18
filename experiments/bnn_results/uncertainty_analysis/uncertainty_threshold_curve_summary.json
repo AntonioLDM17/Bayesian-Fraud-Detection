@@ -1,19 +1,19 @@
 {
   "metadata": {
-    "uncertainty_csv_path": "experiments/bnn_results/uncertainty_analysis/test_uncertainty_per_sample.csv",
-    "evaluation_json_path": "experiments/full_evaluation.json",
+    "uncertainty_csv_path": "experiments\\bnn_results\\uncertainty_analysis\\test_uncertainty_per_sample.csv",
+    "evaluation_json_path": "experiments\\full_evaluation.json",
     "optimal_probability_threshold": 0.8999524712562561,
     "block_probability_threshold": 0.8,
-    "current_uncertainty_threshold_in_config": 0.1
+    "current_uncertainty_threshold_in_config": 0.1857
   },
   "current_threshold_operating_point": {
-    "uncertainty_threshold": 0.1,
-    "accept_rate": 0.27492012218672096,
-    "review_rate": 0.7235174326744145,
-    "block_rate": 0.0015624451388645062,
-    "fraud_in_accept_rate": 6.385696040868455e-05,
-    "fraud_in_review_rate": 0.0006066047121054037,
-    "fraud_in_block_rate": 0.8089887640449438
+    "uncertainty_threshold": 0.1857,
+    "accept_rate": 0.5740318106808048,
+    "review_rate": 0.42426529967346654,
+    "block_rate": 0.0017028896457287315,
+    "fraud_in_accept_rate": 3.058291026974127e-05,
+    "fraud_in_review_rate": 0.0008275747920718334,
+    "fraud_in_block_rate": 0.7938144329896907
   },
   "suggested_threshold": {
     "uncertainty_threshold": 0.18571930169491524,
