@@ -44,7 +44,7 @@
 \setlength{\belowcaptionskip}{0pt}
 
 
-\title{Detección de fraude basada en incertidumbre con redes bayesianas: de la predicción a la decisión}
+\title{Detección de fraude mediante Redes Neuronales Bayesianas: decisiones bajo incertidumbre}
 
 \author{
 Antonio Lorenzo Díaz Meco y Javier Ríos Montes \\
@@ -56,9 +56,7 @@ Proyecto Final --- Inteligencia Artificial Probabilística
 \maketitle
 
 \begin{abstract}
-    La detección de fraude es un problema de decisión bajo incertidumbre en el que la automatización total puede ser arriesgada. En este trabajo proponemos un enfoque que combina modelos deterministas con una red neuronal bayesiana para transformar probabilidades predictivas en una política de triaje operativo (\textsc{Accept}, \textsc{Review}, \textsc{Block}).
-
-    Aquí estuvo Javi!
+    Este trabajo desarrolla un enfoque que combina modelos deterministas con una red neuronal bayesiana para transformar probabilidades predictivas en una política de triaje operativo (\textsc{Accept}, \textsc{Review}, \textsc{Block}), todo ello en el contexto de detección de fraude con tarjetas de crédito.
 
     El sistema estima tanto la probabilidad de fraude como la incertidumbre predictiva, y utiliza esta última para implementar predicción selectiva y control de cobertura-riesgo. Los resultados muestran que, aunque los modelos basados en árboles dominan en rendimiento predictivo y calibración, la red bayesiana permite identificar regiones de alta incertidumbre donde la automatización es menos fiable.
 
@@ -73,7 +71,11 @@ Sin embargo, la mayoría de enfoques en fraude tabular se centran en optimizar m
 
 En este trabajo proponemos un enfoque basado en incertidumbre que combina baselines deterministas con una red neuronal bayesiana (BNN). El sistema estima probabilidad de fraude e incertidumbre y las integra en una política de triaje con tres acciones: \textsc{Accept}, \textsc{Review} y \textsc{Block}. Este diseño permite implementar predicción selectiva y analizar explícitamente el compromiso cobertura-riesgo.
 
-La pregunta central es si un modelo bayesiano puede aportar valor práctico en detección de fraude aunque no sea el mejor en métricas clásicas de clasificación. Nuestra hipótesis es que su utilidad reside en identificar regiones de alta incertidumbre donde la automatización es menos fiable.
+% La pregunta central es si un modelo bayesiano puede aportar valor práctico en detección de fraude aunque no sea el mejor en métricas clásicas de clasificación. Nuestra hipótesis es que su utilidad reside en identificar regiones de alta incertidumbre donde la automatización es menos fiable.
+
+En última instancia, este proyecto no sólo busca comparar modelos de detección de fraude, sino explorar cómo no existe una regla universal mediante la cual juzgar nuestros modelos (p.ej., PR-AUC ó NLL), sino que la utilidad de cada modelo depende de cómo se traduzca su salida en decisiones operativas. En este sentido, el valor de un modelo bayesiano no procederá, necesariamente, de superar a los modelos tabulares en clasificación pura, sino de hacer visible qué parte del espacio de decisión debería tratarse con mayor cautela.
+
+\newpage
 
 \paragraph{Contribuciones.}
 \begin{itemize}
@@ -87,23 +89,23 @@ La pregunta central es si un modelo bayesiano puede aportar valor práctico en d
 
 \subsection{Planteamiento del problema}
 
-Sea $\mathcal{D}=\{(x_i,y_i)\}_{i=1}^{N}$, con $x_i \in \mathbb{R}^{d}$ y $y_i \in \{0,1\}$,
+Sea $\mathcal{D}=\{(x_i,y_i)\}_{i=1}^{N}$, con $x_i \in \mathbb{R}^{d}$ e $y_i \in \{0,1\}$,
 donde $y_i=1$ indica fraude. El objetivo no es solo estimar
-$p(y_i=1\mid x_i,\mathcal{D})$
+$p(y_i=1\mid x_i,\mathcal{D})$ (es decir, la probabilidad de que una transacción con ciertas características sea fraudulenta),
 sino producir además una señal de incertidumbre y traducir ambas cantidades en una acción operativa
 $a_i \in \{\textsc{Accept},\textsc{Review},\textsc{Block}\}$.
 
-Desde el punto de vista funcional, el sistema debe emitir probabilidades predictivas, cuantificar incertidumbre a nivel de muestra y permitir inspección interactiva de casos. Desde el punto de vista no funcional, debe ser reproducible, medible en latencia de inferencia y evaluable con métricas probabilísticas adecuadas. El interés de este planteamiento es operativo: en fraude, un falso negativo puede ser costoso, mientras que una revisión humana tiene un coste intermedio. Por tanto, la cuestión relevante no es únicamente qué modelo clasifica mejor, sino cuál permite tomar decisiones más seguras bajo incertidumbre.
+Desde el punto de vista funcional, el sistema debe emitir probabilidades predictivas, cuantificar incertidumbre a nivel de muestra y permitir inspección interactiva de casos. Desde el punto de vista no funcional, debe ser reproducible, medible en latencia de inferencia y evaluable con métricas probabilísticas adecuadas. El interés de este planteamiento es operativo: en fraude, un falso negativo puede ser costoso, mientras que una revisión humana tiene un coste intermedio. Por tanto, la cuestión relevante no es únicamente qué modelo clasifica mejor, sino cuál permite tomar decisiones más seguras bajo incertidumbre (evitar, en la medida de lo posible, dedicar recursos humanos a casos de bajo riesgo o automatizar casos de alto riesgo).
 
 \subsection{Bayesian neural network}
 
-Las redes neuronales bayesianas permiten modelar incertidumbre sobre los pesos y, por extensión, sobre las predicciones. Bayes by Backprop aproximó este problema mediante inferencia variacional y optimización del ELBO \citep{blundell2015,kingma2014}. Aunque MC dropout también puede interpretarse como una aproximación bayesiana \citep{gal2016}, en este proyecto el \emph{dropout} se desactiva para que la incertidumbre proceda únicamente del posterior variacional sobre los pesos. La implementación probabilística se apoya en Pyro \citep{pyrosvi,pyroautoguide,pyropredictive}.
+Las redes neuronales bayesianas permiten modelar incertidumbre sobre los pesos y, por extensión, sobre las predicciones. \textit{Bayes by Backprop} aproximó este problema mediante inferencia variacional y optimización del ELBO \citep{blundell2015,kingma2014}. Aunque MC dropout también puede interpretarse como una aproximación bayesiana \citep{gal2016}, en este proyecto el \emph{dropout} se desactiva para que la incertidumbre proceda únicamente del posterior variacional sobre los pesos. La implementación probabilística se apoya en Pyro \citep{pyrosvi,pyroautoguide,pyropredictive}.
 
 La BNN es un MLP bayesiano con dos capas ocultas:
 \[
     f_w(x)=W_3\,\phi\!\left(W_2\,\phi\!\left(W_1x+b_1\right)+b_2\right)+b_3,
 \]
-donde $\phi(\cdot)$ es la activación SiLU. El vector completo de parámetros se denota por
+donde $\phi(\cdot)$ es la activación SiLU \footnote{La función SiLU (Sigmoid Linear Unit) es definida como $\phi(x) = x \cdot \sigma(x)$, donde $\sigma(x)$ es la función sigmoide. Es ventajosa, respecto a otras alternativas como ReLU, gracias a que \textit{produce} gradientes más suaves y evita \textit{neuronas muertas}}. El vector completo de parámetros se denota por\\
 $w=\{W_1,b_1,W_2,b_2,W_3,b_3\}$.
 
 Sobre cada bloque de pesos y sesgos se definen priors gaussianos independientes con escala
@@ -145,7 +147,7 @@ El objetivo es maximizar el ELBO
     -
     \mathrm{KL}\!\left(q_{\phi}(w)\,\|\,p(w)\right).
 \]
-Equivalentemente, se minimiza $-\mathcal{L}(\phi)$. Con minibatches $\mathcal{B}$ de tamaño $M$, Pyro optimiza una estimación estocástica
+Equivalentemente, se minimiza $-\mathcal{L}(\phi)$ (de cara a poder aplicar métodos como \textit{SGD}). Con minibatches $\mathcal{B}$ de tamaño $M$, Pyro optimiza una estimación estocástica
 \[
     \widehat{\mathcal{L}}(\phi)=
     \frac{N}{M}\sum_{i\in\mathcal{B}}
@@ -163,7 +165,8 @@ Para un nuevo ejemplo $x^\star$, la probabilidad predictiva bayesiana ideal es
     =
     \int \sigma(f_w(x^\star))\,p(w\mid\mathcal{D})\,dw.
 \]
-En la implementación se aproxima mediante Monte Carlo sobre la guía:
+
+donde podemos interpretar $\sigma(f_w(x^\star))$ como la probabilidad de fraude dada una configuración concreta de pesos $w$. Sin embargo, como ya hemos visto, la posterior $p(w\mid\mathcal{D})$ es intratable, por lo que se aproxima mediante $q_{\phi}(w)$. Por lo tanto, la probabilidad predictiva aproximada se estima mediante muestreo Monte Carlo:
 \[
     \hat{p}(x^\star)=
     \frac{1}{S}\sum_{s=1}^{S}\sigma\!\left(f_{w^{(s)}}(x^\star)\right),
@@ -171,7 +174,7 @@ En la implementación se aproxima mediante Monte Carlo sobre la guía:
     w^{(s)}\sim q_{\phi}(w).
 \]
 
-La incertidumbre predictiva usada por el sistema es la desviación estándar de esas probabilidades muestrales:
+Mediante dichas muestras, se establece una señal de incertidumbre basada en la desviación estándar de las probabilidades inducidas por distintas muestras del posterior:
 \[
     u(x^\star)=
     \sqrt{
@@ -182,24 +185,29 @@ La incertidumbre predictiva usada por el sistema es la desviación estándar de 
         \right)^2
     }.
 \]
+donde el término de normalización $1/(S-1)$ se incluye para obtener una estimación \textbf{no sesgada }de la varianza muestral.
 
-Esta cantidad no es una descomposición formal aleatoric/epistemic, pero sí una señal operativa consistente de dispersión posterior que el sistema aprovecha para abstención selectiva y triaje. En términos prácticos, una incertidumbre alta significa que distintas muestras del posterior inducen probabilidades de fraude sustancialmente distintas para una misma transacción. Esa variabilidad es interpretable como una falta de estabilidad de la decisión automática: aunque la probabilidad media pueda ser moderada o incluso alta, el sistema no debería comportarse igual que en un caso donde distintas muestras del posterior coinciden de forma consistente. Por ello, en este trabajo la incertidumbre no se interpreta como una estadística decorativa, sino como una señal de fiabilidad útil para controlar el grado de automatización.
+En nuestro caso, la incertidumbre no se descompone, estrictamente, en una parte aleatoria y otra epistémica. En su lugar, usamos una medida simple de dispersión posterior que refleja la estabilidad de la predicción ante variaciones en los pesos. De esta forma, una alta desviación estándar se puede interpretar como una señal de que distintas muestras del posterior sobre pesos producen predicciones muy diferentes a una misma transacción, lo que sugiere que el modelo no tiene una convicción clara sobre esa muestra en particular. Dicha señal modula la automatización del sistema, de forma que casos con alta incertidumbre se envían a revisión humana en lugar de automatizarse.
 
-El repositorio no usa un umbral fijo universal. Para cada modelo se selecciona en validación el umbral que maximiza F1:
+\newpage
+
+De cara a derivar transacciones a revisión, la principal pregunta es qué umbral de probabilidad usar para decidir cuándo una transacción es lo suficientemente riesgosa como para no aceptarla automáticamente. Es decir, dado \( \hat{p}(x) \) (la estimación de la probabilidad de fraude), ¿qué valor de \( \tau \,|\, \if \hat{p}(x) \geq \tau \rightarrow \textsc{Review} \) es el más adecuado?
+
+Si bien podríamos elegir un umbral arbitrario (p.ej., 0.5), esto no reflejaría necesariamente el mejor punto de operación para nuestro modelo ni para nuestro caso de uso. En su lugar, optamos por validar el umbral óptimo en el conjunto de validación, buscando maximizar la métrica F1:
 \[
     \tau^\star=
     \arg\max_{\tau\in[0,1]}
     \mathrm{F1}\bigl(y,\mathbb{I}[\hat{p}(x)\ge \tau]\bigr),
 \]
-y ese mismo umbral se reutiliza sin reoptimización en test. Esto evita \emph{test leakage} y fija un punto de operación comparable entre modelos. En el caso de la BNN, el umbral validado y reutilizado en test es
-$\tau^\star_{\mathrm{BNN}} = 0.8999524712562561.$
+y ese mismo umbral se reutiliza en test (sin reoptimización). Esto evita \emph{test leakage} y fija un punto de operación comparable entre modelos. En el caso de la BNN, el umbral validado y reutilizado en test es
+$\tau^\star_{\mathrm{BNN}} = 0.8999524712562561 \sim 0.90.$ \footnote{Como detallamos en la sección posterior, dicho umbral es específico para la BNN, ya que cada modelo tiene una curva de precisión-recall diferente. Por tanto, cada modelo tiene su propio umbral validado.}
 
 Sea $\hat{p}(x)$ la probabilidad de fraude estimada por la BNN y $u(x)$ la incertidumbre. La política implementada se formaliza como
 \[
     d(x)=
     \begin{cases}
-        \textsc{Block},  & \hat{p}(x)\ge \tau_{\mathrm{block}} \;\wedge\; u(x)\le \tau_u, \\[4pt]
-        \textsc{Review}, & \hat{p}(x)\ge \tau^\star \;\vee\; u(x)>\tau_u,                 \\[4pt]
+        \textsc{Block},  & \hat{p}(x)\ge \tau_{\mathrm{block}} \;\text{AND}\; u(x)\le \tau_u, \\[4pt]
+        \textsc{Review}, & \hat{p}(x)\ge \tau^\star \;\text{OR}\; u(x)>\tau_u,                \\[4pt]
         \textsc{Accept}, & \text{en otro caso},
     \end{cases}
 \]
@@ -228,6 +236,8 @@ La precisión selectiva se resume por
 
 Esta formulación se alinea con la literatura de clasificación selectiva \citep{elyaniv2010}. En resumen, el modelo no solo produce una predicción probabilística, sino que convierte dicha predicción en una política explícita de automatización parcial.
 
+\newpage
+
 \section{Configuración experimental}
 
 \subsection{Datos y preprocesado}
@@ -249,7 +259,7 @@ El desbalance se trata de forma distinta según el modelo:
 
 \subsection{Modelos, entrenamiento y protocolo de evaluación}
 
-Además de la BNN, comparamos \emph{Logistic Regression}, \emph{Random Forest} y \emph{XGBoost} como baselines deterministas fuertes. La Tabla~\ref{tab:hyperparams} resume únicamente los hiperparámetros que más condicionan el comportamiento probabilístico y computacional del sistema. Se omiten parámetros secundarios de implementación para priorizar la interpretación experimental.
+Además de la BNN, comparamos \emph{Logistic Regression}, \emph{Random Forest} y \emph{XGBoost} como baselines deterministas fuertes. A continuación, resumimos los hiperparámetros que más condicionan el comportamiento probabilístico y computacional del sistema, omitiendo parámetros secundarios de implementación para priorizar la interpretación experimental.
 
 \begin{table}[!htbp]
     \centering
