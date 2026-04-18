@@ -1,0 +1,40 @@
+{
+  "models": {
+    "baseline_results/logistic_regression": {
+      "num_samples": 56962,
+      "accept_rate": 0.9898177732523437,
+      "review_rate": 0.0,
+      "block_rate": 0.010182226747656332,
+      "accept_fraud_rate": 0.00019509772622468163,
+      "review_fraud_rate": null,
+      "block_fraud_rate": 0.15
+    },
+    "baseline_results/random_forest": {
+      "num_samples": 56962,
+      "accept_rate": 0.9985253326779256,
+      "review_rate": 0.00043888908395070395,
+      "block_rate": 0.0010357782381236614,
+      "accept_fraud_rate": 0.0003340483139350891,
+      "review_fraud_rate": 0.88,
+      "block_fraud_rate": 0.9661016949152542
+    },
+    "boosting_results/xgboost": {
+      "num_samples": 56962,
+      "accept_rate": 0.9984375548611355,
+      "review_rate": 0.0,
+      "block_rate": 0.0015624451388645062,
+      "accept_fraud_rate": 0.00028132857419161994,
+      "review_fraud_rate": null,
+      "block_fraud_rate": 0.9213483146067416
+    },
+    "bnn_results/bayesian_neural_network": {
+      "num_samples": 56962,
+      "accept_rate": 0.2612970050208911,
+      "review_rate": 0.7371229942768863,
+      "block_rate": 0.0015800007022225343,
+      "accept_fraud_rate": 0.0,
+      "review_fraud_rate": 0.0005477755549204535,
+      "block_fraud_rate": 0.8333333333333334
+    }
+  }
+}
