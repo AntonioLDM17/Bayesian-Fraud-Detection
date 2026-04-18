@@ -29,12 +29,12 @@
     },
     "bnn_results/bayesian_neural_network": {
       "num_samples": 56962,
-      "accept_rate": 0.2612970050208911,
-      "review_rate": 0.7371229942768863,
-      "block_rate": 0.0015800007022225343,
-      "accept_fraud_rate": 0.0,
-      "review_fraud_rate": 0.0005477755549204535,
-      "block_fraud_rate": 0.8333333333333334
+      "accept_rate": 0.5675713633650504,
+      "review_rate": 0.4306555247357888,
+      "block_rate": 0.001773111899160844,
+      "accept_fraud_rate": 3.093102381688834e-05,
+      "review_fraud_rate": 0.000693000693000693,
+      "block_fraud_rate": 0.7920792079207921
     }
   }
 }

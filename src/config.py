@@ -150,7 +150,7 @@ GPLVM_SOURCE_SPLIT: str = "test"
 
 BLOCK_PROBABILITY_THRESHOLD: float = 0.80
 REVIEW_PROBABILITY_THRESHOLD: float = 0.30
-UNCERTAINTY_THRESHOLD: float = 0.10
+UNCERTAINTY_THRESHOLD: float = 0.1857
 
 
 # ============================================================
