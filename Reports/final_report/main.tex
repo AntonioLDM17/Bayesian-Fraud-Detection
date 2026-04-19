@@ -404,27 +404,13 @@ La forma de arco que aparece en la nube de puntos es especialmente informativa, 
     \label{fig:prob_vs_unc}
 \end{figure}
 
-Esta lectura se refuerza con la Figura~\ref{fig:unc_by_confusion}, que nos ofrece otra perspectiva: los errores más problemáticos tienden a concentrarse en niveles más altos de incertidumbre.
+Esta lectura se refuerza con la Figura~\ref{fig:unc_by_confusion}, dispuesta en el Apéndice~\ref{app:unc_by_confusion}, que nos ofrece otra perspectiva: los errores más problemáticos tienden a concentrarse en niveles más altos de incertidumbre.
 
 En particular, los falsos negativos aparecen desplazados hacia valores más altos que los verdaderos positivos, lo cual es importante porque el falso negativo es precisamente el error más costoso en este contexto. La figura no implica que la incertidumbre separe perfectamente aciertos y errores, pero sí sugiere que los casos más delicados se concentran en regiones donde la posterior predictiva es menos estable. Desde el punto de vista operativo, esto refuerza la conveniencia de derivar esos casos hacia revisión en lugar de automatizarlos.
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.60\linewidth]{figures/test_uncertainty_by_confusion_type.png}
-    \caption{Incertidumbre por tipo de confusión.}
-    \label{fig:unc_by_confusion}
-\end{figure}
-
-La Figura~\ref{fig:coverage_risk} formaliza esta idea mediante el análisis riesgo-cobertura. A medida que el sistema restringe la automatización al subconjunto menos incierto, el riesgo empírico disminuye. En consecuencia, la incertidumbre no actúa solo como descriptor estadístico, sino como variable de control para modular la agresividad de la decisión automática.
+La Figura~\ref{fig:coverage_risk} (\ref{app:coverage_risk}) formaliza esta idea mediante el análisis riesgo-cobertura. A medida que el sistema restringe la automatización al subconjunto menos incierto, el riesgo empírico disminuye. En consecuencia, la incertidumbre no actúa solo como descriptor estadístico, sino como variable de control para modular la agresividad de la decisión automática.
 
 La caída brusca del riesgo al abandonar las regiones más inciertas sugiere que la señal de incertidumbre efectivamente ordena los ejemplos según su fiabilidad relativa. Aunque la escala del riesgo está condicionada por el fuerte desbalance del problema, la tendencia global es clara: automatizar menos y mejor permite reducir errores sobre el subconjunto retenido. Esta figura, por tanto, no solo respalda la intuición cualitativa de las figuras anteriores, sino que ofrece una justificación cuantitativa de la abstención selectiva.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.60\linewidth]{figures/test_coverage_vs_risk.png}
-    \caption{Curva cobertura-riesgo del BNN.}
-    \label{fig:coverage_risk}
-\end{figure}
 
 Esta parte es una de las evidencias más fuertes del valor práctico del enfoque. Si una señal de incertidumbre es útil, debería permitir mejorar la calidad de las decisiones reteniendo únicamente los casos más fiables; y precisamente eso es lo que sugiere la curva cobertura-riesgo: cuanto más restrictivo es el sistema con la automatización, menor es el riesgo asumido sobre el subconjunto automatizado. Así, la incertidumbre puede interpretarse como una herramienta para regular de forma continua el compromiso entre volumen automatizado y seguridad.
 
@@ -557,7 +543,31 @@ La conclusión principal no es que el modelo bayesiano sea globalmente mejor, si
     \end{figure}
 
     Analizando la gráfica, podríamos caer en la tentación de concluir que el umbral de incertidumbre \( \tau_u \) parece ser demasiado bajo (ya que su región, \emph{Revisar}, comprende una gran proporción del área del cuadrado unitario). Sin embargo, es importante recordar que el umbral se selecciona en función de la tasa de fraude residual en \textsc{Accept}, no simplemente por la distribución visual de los puntos. Por un lado, la distribución de transacciones en el espacio de decisiones no es uniforme, sino que se concentra en ciertas regiones (principalmente, cerca de probabilidades bajas). Por otro lado, el umbral de incertidumbre se ajusta para maximizar la automatización sin comprometer la seguridad, lo que implica aceptar una cierta cantidad de casos en \textsc{Review} a cambio de reducir el riesgo en \textsc{Accept}.
+    \newpage
+    \subsection{Incertidumbre por tipo de error}
+    \label{app:unc_by_confusion}
 
+    Para complementar la interpretación de la Figura~\ref{fig:prob_vs_unc}, la Figura~\ref{fig:unc_by_confusion} muestra la distribución de incertidumbre para cada tipo de confusión (verdaderos positivos, falsos positivos, verdaderos negativos y falsos negativos). Esta visualización permite observar si los errores más problemáticos (especialmente los falsos negativos) tienden a concentrarse en niveles más altos de incertidumbre, lo que reforzaría la idea de que la señal de incertidumbre es útil para identificar casos donde el modelo es menos confiable.
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.60\linewidth]{figures/test_uncertainty_by_confusion_type.png}
+        \caption{Incertidumbre por tipo de confusión.}
+        \label{fig:unc_by_confusion}
+    \end{figure}
+
+    \subsection{Cobertura de riesgo}
+    \label{app:coverage_risk}
+
+    La Figura~\ref{fig:coverage_risk} muestra la curva de cobertura-riesgo del BNN, que ilustra cómo el riesgo empírico (tasa de fraude residual) disminuye a medida que se restringe la automatización a los casos con menor incertidumbre. Esta curva es fundamental para entender el trade-off entre volumen automatizado y seguridad, y para justificar cuantitativamente la utilidad de la señal de incertidumbre en la gestión operativa del riesgo.
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.60\linewidth]{figures/test_coverage_vs_risk.png}
+        \caption{Curva cobertura-riesgo del BNN.}
+        \label{fig:coverage_risk}
+    \end{figure}
+    \newpage
     \section{Explicación de las Métricas}
 
     Si bien, en el cuerpo del trabajo, asumimos que el lector está familiarizado con las métricas de clasificación, incluimos esta seción para proporcionar una explicación detallada de cada métrica utilizada, su interpretación y su relevancia para el caso de uso específico de detección de fraude.
