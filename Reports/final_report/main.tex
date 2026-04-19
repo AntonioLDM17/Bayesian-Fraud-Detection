@@ -34,6 +34,8 @@
 \renewcommand{\textfraction}{0.07}
 \renewcommand{\floatpagefraction}{0.8}
 
+\captionsetup{justification=centering}
+
 % Reduce espacio alrededor de figuras y tablas (sin romper NeurIPS)
 \setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
 \setlength{\floatsep}{8pt plus 2pt minus 2pt}
@@ -80,7 +82,6 @@ En última instancia, este proyecto no sólo busca comparar modelos de detecció
     \item Comparamos una BNN con baselines deterministas, evaluando tanto rendimiento predictivo como utilidad decisional.
     \item Introducimos una política de triaje (\textsc{Accept/Review/Block}) basada en probabilidad e incertidumbre, junto con análisis de predicción selectiva.
     \item Mostramos que el umbral de incertidumbre no es un hiperparámetro fijo arbitrario, sino una palanca operativa que puede ajustarse para equilibrar automatización y riesgo residual.
-    \item Complementamos el estudio con una representación latente mediante GPLVM y una interfaz interactiva.
 \end{itemize}
 
 \section{Método}
@@ -128,7 +129,7 @@ que es intratable para una red no lineal.
 
 \subsection{Inferencia variacional}
 
-El entrenamiento usa \texttt{SVI} con \texttt{Trace\_ELBO} y una guía \texttt{AutoDiagonalNormal}. Aproximamos la posterior mediante una familia de campo medio:
+El entrenamiento usa \texttt{SVI} con \texttt{Trace\_ELBO} y una guía \texttt{AutoDiagonalNormal}. Aproximamos la posterior mediante una familia de campo medio (MFA-VI):
 \[
     q_{\phi}(w)=\mathcal{N}\!\bigl(w;\mu,\mathrm{diag}(s^2)\bigr),
 \]
@@ -184,20 +185,15 @@ Mediante dichas muestras, se establece una señal de incertidumbre basada en la 
     }.
 \]
 
-En nuestro caso, la incertidumbre no se descompone estrictamente en una parte aleatoria y otra epistémica. En su lugar, usamos una medida simple de dispersión posterior que refleja la estabilidad de la predicción ante variaciones en los pesos. De esta forma, una alta desviación estándar se puede interpretar como una señal de que distintas muestras del posterior sobre pesos producen predicciones muy diferentes para una misma transacción, lo que sugiere que el modelo no tiene una convicción clara sobre esa muestra en particular. Dicha señal modula la automatización del sistema, de forma que casos con alta incertidumbre se envían a revisión humana en lugar de automatizarse.
+En nuestro caso, la incertidumbre no se descompone explícitamente en parte aleatoria y parte epistémica. Usamos en su lugar la desviación estándar de las probabilidades de fraude obtenidas a partir de distintas muestras del posterior sobre los pesos. Una desviación alta indica que el modelo da respuestas muy diferentes para la misma transacción, es decir, que su predicción es inestable.
 
-\newpage
-
-De cara a derivar transacciones a revisión, la principal pregunta es qué umbral de probabilidad usar para decidir cuándo una transacción es lo suficientemente riesgosa como para no aceptarla automáticamente. Es decir, dado \( \hat{p}(x) \), ¿qué valor de \( \tau \) es el más adecuado?
-
-Si bien podríamos elegir un umbral arbitrario (p.ej., 0.5), esto no reflejaría necesariamente el mejor punto de operación para nuestro modelo ni para nuestro caso de uso. En su lugar, optamos por validar el umbral óptimo en el conjunto de validación, buscando maximizar la métrica F1:
+Para decidir qué transacciones derivar a revisión necesitamos fijar un umbral $\tau$ sobre la probabilidad de fraude. En lugar de usar un umbral arbitrario (p.ej., $\tau=0.5$), seleccionamos \( \tau^\star \) maximizando la métrica F1 en el conjunto de validación:
 \[
     \tau^\star=
     \arg\max_{\tau\in[0,1]}
     \mathrm{F1}\bigl(y,\mathbb{I}[\hat{p}(x)\ge \tau]\bigr),
 \]
-y ese mismo umbral se reutiliza en test (sin reoptimización). Esto evita \emph{test leakage} y fija un punto de operación comparable entre modelos. En el caso de la BNN, el umbral validado y reutilizado en test es
-$\tau^\star_{\mathrm{BNN}} = 0.8999524712562561 \sim 0.90.$ \footnote{Como detallamos en la sección posterior, dicho umbral es específico para la BNN, ya que cada modelo tiene una curva de precisión-recall diferente. Por tanto, cada modelo tiene su propio umbral validado.}
+y reutilizamos es mismo umbral en test, evitando \emph{test leakage} y permitiendo fijar un punto de operación comparable entre modelos. En el caso de la BNN, el umbral validado es, aproximadamente, $\tau^\star_{\mathrm{BNN}} \approx 0.90.$ \footnote{Como detallamos en la sección posterior, dicho umbral es específico para la BNN, ya que cada modelo tiene una curva de precisión-recall diferente. Por tanto, cada modelo tiene su propio umbral validado.}
 
 Sea $\hat{p}(x)$ la probabilidad de fraude estimada por la BNN y $u(x)$ la incertidumbre. La política implementada se formaliza como
 \[
@@ -366,6 +362,8 @@ Además, los diagramas sugieren matices entre los propios baselines. Random Fore
     \label{fig:reliability}
 \end{figure}
 
+\newpage
+
 La Tabla~\ref{tab:decision_table} resume la transición desde probabilidad e incertidumbre hacia decisiones accionables. A diferencia del operating point inicial con $\tau_u=0.10$, que era extremadamente conservador, el umbral ajustado $\tau_u\approx 0.186$ permite automatizar una fracción sustancial del flujo manteniendo un fraude residual muy bajo en \textsc{Accept}. \textsc{Accept} concentra transacciones de riesgo muy bajo; \textsc{Block} sigue recogiendo una fracción mínima de operaciones, pero con una tasa de fraude extraordinariamente alta; y \textsc{Review} absorbe la región ambigua donde automatizar resultaría más arriesgado.
 
 \begin{table}[!htbp]
@@ -406,7 +404,7 @@ La forma de arco que aparece en la nube de puntos es especialmente informativa, 
     \label{fig:prob_vs_unc}
 \end{figure}
 
-Esta lectura se refuerza con la Figura~\ref{fig:unc_by_confusion}, que añade una observación operativamente relevante: los errores más problemáticos tienden a concentrarse en niveles más altos de incertidumbre.
+Esta lectura se refuerza con la Figura~\ref{fig:unc_by_confusion}, que nos ofrece otra perspectiva: los errores más problemáticos tienden a concentrarse en niveles más altos de incertidumbre.
 
 En particular, los falsos negativos aparecen desplazados hacia valores más altos que los verdaderos positivos, lo cual es importante porque el falso negativo es precisamente el error más costoso en este contexto. La figura no implica que la incertidumbre separe perfectamente aciertos y errores, pero sí sugiere que los casos más delicados se concentran en regiones donde la posterior predictiva es menos estable. Desde el punto de vista operativo, esto refuerza la conveniencia de derivar esos casos hacia revisión en lugar de automatizarlos.
 
@@ -428,7 +426,7 @@ La caída brusca del riesgo al abandonar las regiones más inciertas sugiere que
     \label{fig:coverage_risk}
 \end{figure}
 
-Esta parte es una de las evidencias más fuertes del valor práctico del enfoque. Si una señal de incertidumbre es útil, debería permitir mejorar la calidad de las decisiones reteniendo únicamente los casos más fiables; y precisamente eso es lo que sugiere la curva cobertura-riesgo. La lectura operativa es directa: cuanto más restrictivo es el sistema con la automatización, menor es el riesgo asumido sobre el subconjunto automatizado. Por tanto, la incertidumbre puede interpretarse como una herramienta para regular de forma continua el compromiso entre volumen automatizado y seguridad.
+Esta parte es una de las evidencias más fuertes del valor práctico del enfoque. Si una señal de incertidumbre es útil, debería permitir mejorar la calidad de las decisiones reteniendo únicamente los casos más fiables; y precisamente eso es lo que sugiere la curva cobertura-riesgo: cuanto más restrictivo es el sistema con la automatización, menor es el riesgo asumido sobre el subconjunto automatizado. Así, la incertidumbre puede interpretarse como una herramienta para regular de forma continua el compromiso entre volumen automatizado y seguridad.
 
 Además, el hecho de que la incertidumbre aumente justamente en regiones ambiguas y en tipos de error problemáticos apoya la coherencia interna del enfoque. No se trata solo de que el modelo produzca una desviación estándar numérica, sino de que esa magnitud se alinea con casos donde intuitivamente esperaríamos menor fiabilidad. Esto refuerza la idea de que la BNN añade valor no por superar a los baselines en clasificación, sino por hacer visible qué parte del espacio de decisión debería tratarse con mayor cautela.
 
@@ -453,7 +451,7 @@ La Tabla~\ref{tab:efficiency} resume el coste computacional de los modelos en in
     \end{tabular}
 \end{table}
 
-En otras palabras, el enriquecimiento probabilístico tiene un coste explícito. El uso de una BNN en este contexto solo se justifica si la mejora en control del riesgo compensa la penalización computacional. El sistema incluye además un \emph{frontend} funcional en Streamlit para \emph{batch scoring}, exploración de casos y \emph{dashboard}, así como un \texttt{Dockerfile} para despliegue reproducible. También se implementa una capa de monitorización \emph{snapshot-style} que resume distribución de decisiones, incertidumbre y señales agregadas de riesgo. No se trata de una monitorización online en producción, sino de una primera aproximación reproducible a evaluación post-despliegue.
+En otras palabras, el enriquecimiento probabilístico tiene un coste explícito. El uso de una BNN en este contexto solo se justifica si la mejora en control del riesgo compensa la penalización computacional. Usamos docker, streamlit para la demo web y una capa de monitorización con diferentes archivos que monitorizan las decisiones, incertidumbre y el riesgo residual en \textsc{Accept}. Sin embargo, la monitorización es offline y no se ha implementado un sistema de producción online, lo que limita la generalización de los resultados a entornos reales.
 
 \paragraph{Consistencia de artefactos.}
 Todos los umbrales de probabilidad, métricas de clasificación y reglas base del sistema se derivan directamente de los artefactos experimentales validados. En cambio, el umbral de incertidumbre $\tau_u$ reportado en la política final se fija mediante un análisis \emph{post hoc} del compromiso entre cobertura automática y fraude residual en \textsc{Accept}. Por tanto, los resultados de triaje deben interpretarse como un análisis operativo sobre la salida del modelo ya entrenado, no como un procedimiento de ajuste validado en un conjunto independiente.
@@ -470,6 +468,8 @@ Sin embargo, en el plano decisional la conclusión es distinta. La BNN permite c
 La comparación final, por tanto, no es simplemente entre ``mejor'' y ``peor'' modelo. Si el objetivo fuese únicamente maximizar rendimiento predictivo offline, los modelos de árbol serían la opción natural. Si, en cambio, el objetivo incluye controlar mejor cuándo automatizar, cuándo derivar y cuándo aceptar el coste de una revisión humana, entonces la BNN ofrece una ventaja cualitativamente distinta. Ese es el trade-off central del trabajo: renunciar a parte del rendimiento puro a cambio de una señal explícita de incertidumbre que permite tomar decisiones más prudentes y más adaptadas al coste del error.
 
 La conclusión principal no es que el modelo bayesiano sea globalmente mejor, sino que permite transformar una predicción binaria en una política de decisión más segura. En aplicaciones sensibles al riesgo, esa capacidad puede justificar su uso incluso cuando no domina en PR-AUC o NLL.
+
+\newpage
 
 \begin{thebibliography}{99}
 
@@ -539,5 +539,79 @@ La conclusión principal no es que el modelo bayesiano sea globalmente mejor, si
     \newblock \url{https://docs.pyro.ai/en/stable/_modules/pyro/infer/predictive.html}, consultado el 17 de abril de 2026.
 
 \end{thebibliography}
+
+\newpage
+
+\begin{appendix}
+    \section{Visualizaciones Adicionales}
+
+    \subsection{Espacio de Decisiones}
+
+    De cara a ilustrar, más comprensiblemente, cómo se distribuyen las decisiones del sistema en función de los umbrales óptimos (\( \tau^\star \) y \( \tau_u \)), la Figura~\ref{fig:decision_space} muestra un diagrama de dispersión de las probabilidades predichas por el modelo frente a su incertidumbre, coloreado según la decisión final (\textsc{Accept}, \textsc{Review}, \textsc{Block}):
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.60\linewidth]{figures/decision_space.png}
+        \caption{Espacio de decisiones (simplificado) del BNN. Medida de incertidumbre en el eje vertical, probabilidad predicha en el eje horizontal. Las líneas punteadas indican los umbrales de decisión para cada bucket.}
+        \label{fig:decision_space}
+    \end{figure}
+
+    Analizando la gráfica, podríamos caer en la tentación de concluir que el umbral de incertidumbre \( \tau_u \) parece ser demasiado bajo (ya que su región, \emph{Revisar}, comprende una gran proporción del área del cuadrado unitario). Sin embargo, es importante recordar que el umbral se selecciona en función de la tasa de fraude residual en \textsc{Accept}, no simplemente por la distribución visual de los puntos. Por un lado, la distribución de transacciones en el espacio de decisiones no es uniforme, sino que se concentra en ciertas regiones (principalmente, cerca de probabilidades bajas). Por otro lado, el umbral de incertidumbre se ajusta para maximizar la automatización sin comprometer la seguridad, lo que implica aceptar una cierta cantidad de casos en \textsc{Review} a cambio de reducir el riesgo en \textsc{Accept}.
+
+    \section{Explicación de las Métricas}
+
+    Si bien, en el cuerpo del trabajo, asumimos que el lector está familiarizado con las métricas de clasificación, incluimos esta seción para proporcionar una explicación detallada de cada métrica utilizada, su interpretación y su relevancia para el caso de uso específico de detección de fraude.
+
+    \subsection{PR-AUC (Área bajo la curva Precision-Recall)}
+
+    La métrica PR-AUC mide el área bajo la curva que relaciona la precisión (precision) y la sensibilidad (recall) a medida que se varía el umbral de decisión. Resume la capacidad del modelo para identificar correctamente los casos positivos manteniendo una alta precisión, a lo largo de todo el rango de umbrales. Es especialmente relevante en problemas desbalanceados, como la detección de fraude, donde la clase positiva (fraude) es mucho menos frecuente que la clase negativa (no fraude):
+
+    \[
+        \text{PR-AUC} = \int_0^1 \text{Precision}(r) \, dr,
+    \]
+    donde \( r \) es el recall. Un valor de PR-AUC cercano a 1 indica que el modelo puede identificar la mayoría de los casos de fraude con alta precisión, mientras que un valor cercano a 0 indica un rendimiento pobre. Además, en clasificación binaria, una PR-AUC de 0.5 corresponde a un modelo que clasifica aleatoriamente.
+
+    Por lo tanto, puede ser más informativa que la ROC-AUC en este contexto, ya que esta última puede mantenerse constante incluso si el modelo tiene un rendimiento pobre en la clase minoritaria.
+
+    \subsection{ROC-AUC (Área bajo la curva Receiver Operating Characteristic)}
+
+    La métrica ROC-AUC mide el área bajo la curva que relaciona la tasa de verdaderos positivos (TPR, AKA recall) y la tasa de falsos positivos (FPR) a medida que se varía el umbral de decisión. Al aumentar la sensibilidad, el modelo tenderá a ser más optimista e introducir más falsos positivos, lo que se refleja en la curva ROC. Un valor de ROC-AUC cercano a 1 indica que el modelo tiene una excelente capacidad para distinguir entre las clases, mientras que un valor cercano a 0.5 indica un rendimiento aleatorio.
+
+    \subsection{F1 Score}
+
+    El F1 Score es la media armónica entre la precisión y el recall, y se calcula como:
+    \[
+        F1 = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}.
+    \]
+    Esta métrica es útil para encontrar un equilibrio entre precisión y recall, especialmente en problemas desbalanceados. Un F1 Score alto indica que el modelo tiene tanto una alta precisión como un alto recall. En nuestro caso, nos indica cómo de fino es el equilibrio entre \textit{evitar alarmas por transacciones legítimas} (precisión) y \textit{no dejar pasar transacciones fraudulentas} (recall).
+
+    La principal limitación del F1 Score es que, en caso de ser un valor bajo, no indica si el problema es una baja precisión, un bajo recall o ambos. Por eso, es importante complementarlo con las métricas de precisión y recall por separado.
+
+    \subsection{NLL (Negative Log-Likelihood)}
+
+    El NLL mide la calidad de las probabilidades predichas por el modelo. Se calcula como:
+    \[
+        \text{NLL} = -\frac{1}{N} \sum_{i=1}^N \left[ y_i \log(\hat{p}_i) + (1 - y_i) \log(1 - \hat{p}_i) \right],
+    \]
+    con \( y_i \) siendo la etiqueta verdadera (0 o 1) y \( \hat{p}_i \in [0,1] \) la probabilidad predicha de que la muestra \( i \) pertenezca a la clase positiva. De esta forma, el NLL no se limita a contar errores de clasificación, sino que tiene en cuenta la magnitud del error probabilístico. Un NLL bajo indica que el modelo asigna altas probabilidades a las clases correctas, mientras que un NLL alto indica que el modelo es menos confiable en sus predicciones.
+
+    \subsection{Brier Score}
+
+    El Brier Score es otra métrica de calidad probabilística que mide la media del error cuadrático entre las probabilidades predichas y las etiquetas verdaderas. Se calcula como:
+    \[
+        \text{Brier} = \frac{1}{N} \sum_{i=1}^N (\hat{p}_i - y_i)^2.
+    \]
+    Se puede entender Brier como una variante más suave del NLL. No penaliza tan severamente las predicciones extremas incorrectas, pero sigue siendo sensible a la calidad de las probabilidades. Un Brier Score bajo indica que el modelo es bueno asignando probabilidades cercanas a 0 o 1 para las clases correctas, mientras que un Brier Score alto indica que el modelo es menos confiable.
+
+    \subsection{ECE (Expected Calibration Error)}
+
+    El ECE mide la calibración del modelo, es decir, qué tan bien las probabilidades predichas reflejan la frecuencia real de los eventos. Se calcula agrupando las predicciones en bins según su probabilidad predicha y comparando la precisión dentro de cada bin con la probabilidad media del bin:
+    \[
+        \text{ECE} = \sum_{m=1}^M \frac{|B_m|}{N} |\text{acc}(B_m) - \text{conf}(B_m)|,
+    \]
+    donde \( B_m \) es el conjunto de muestras en el bin \( m \), \( \text{acc}(B_m) \) es la precisión observada en ese bin y \( \text{conf}(B_m) \) es la probabilidad media predicha en ese bin. Un ECE bajo indica que el modelo está bien calibrado, mientras que un ECE alto indica que el modelo tiende a sobreestimar o subestimar la probabilidad de los eventos.
+
+    Es decir si el modelo tiene un ECE cercano al 0 \%, podemo confiar en que las probabilidades predichas están alineadas con la frecuencia real de los eventos. Por ejemplo, entre las transacciones a las que el modelo asigna una probabilidad de fraude del 20 \%, aproximadamente el 20 \% de ellas serán realmente fraudulentas.
+\end{appendix}
 
 \end{document}
